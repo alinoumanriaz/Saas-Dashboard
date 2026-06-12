@@ -1,0 +1,9 @@
+User-Agent: Googlebot
+Disallow: /
+Disallow: /private/
+
+User-Agent: Applebot
+Disallow: /
+
+User-Agent: Bingbot
+Disallow: /
