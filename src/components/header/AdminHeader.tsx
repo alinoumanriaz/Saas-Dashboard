@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { useQuery } from "@apollo/client/react";
 import { setCompanyMember } from "@/redux/slicers/currentCompanyMember";
-import LogoutButton from "../LogoutButton";
 import Link from "next/link";
 import WebsiteDropdown from "../dropdown/WebsiteDropdown";
 import { GET_WEBSITES_BY_COMPANY_ID } from "@/graphql/query/website.query";
+import { WebsiteSwitcher } from "../website-switcher";
+import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon } from "lucide-react";
 
 const AdminHeader = () => {
   const [userDropdown, setUserDropdown] = useState(false);
@@ -62,10 +63,37 @@ const AdminHeader = () => {
     return <div className="sticky top-0 p-2 text-white">Loading websites...</div>;
   }
 
+  const websites= [
+    {
+      name: "Acme Inc",
+      logo: (
+        <GalleryVerticalEndIcon
+        />
+      ),
+      plan: "Enterprise",
+    },
+    {
+      name: "Acme Corp.",
+      logo: (
+        <AudioLinesIcon
+        />
+      ),
+      plan: "Startup",
+    },
+    {
+      name: "Evil Corp.",
+      logo: (
+        <TerminalIcon
+        />
+      ),
+      plan: "Free",
+    },
+  ]
+
   return (
     <div className="sticky top-0 z-50 w-full flex justify-between items-center text-sm py-2 pr-4 px-2">
       <div className="flex justify-center items-center space-x-3">
-        <WebsiteDropdown data={currentCompanyWebsites} />
+        <WebsiteSwitcher websites={websites} />
       </div>
 
       <div className="relative">
@@ -74,55 +102,6 @@ const AdminHeader = () => {
             <div className="font-medium capitalize">{selectedCompanyMember?.role}</div>
           </div>
 
-          <div
-            onClick={() => setUserDropdown(!userDropdown)}
-            className="flex rounded-full justify-center items-center text-[12px] cursor-pointer relative"
-          >
-            <Image
-              className="rounded-full ring-1 ring-gray-200 w-8 h-8 object-cover"
-              src={currentMember?.avatar || "/userPlaceholder.jpg"}
-              alt="user"
-              width={32}
-              height={32}
-            />
-
-            {userDropdown && (
-              <div
-                onMouseLeave={() => setUserDropdown(false)}
-                className="bg-white w-64 shadow-lg p-2 ring-1 ring-gray-200 overflow-hidden rounded-md absolute right-0 top-10 z-50"
-              >
-                <div className="flex items-center space-x-3 p-2 border-b border-gray-200">
-                  <Image
-                    className="rounded-full ring-1 ring-gray-300 w-10 h-10 object-cover"
-                    src={currentMember?.avatar || "/userPlaceholder.jpg"}
-                    alt="user"
-                    width={40}
-                    height={40}
-                  />
-                  <div className="flex flex-col">
-                    <div className="font-medium">{currentMember?.username}</div>
-                    <div className="text-xs text-gray-600 capitalize">{currentMember?.role?.toLowerCase()}</div>
-                  </div>
-                </div>
-
-                <div className="py-1">
-                  <Link
-                    href="/profile"
-                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-blue-600 rounded-md transition-colors duration-200"
-                    onClick={() => setUserDropdown(false)}
-                  >
-                    Profile
-                  </Link>
-                </div>
-
-                <div className="border-t border-gray-200 pt-1">
-                  <div className="px-3 py-2">
-                    <LogoutButton />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

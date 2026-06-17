@@ -3,7 +3,6 @@ import "./globals.css";
 import ApolloWrapper from "@/helpers/ApolloProvider";
 import { ToastContainer } from "react-toastify";
 import { Providers } from "@/redux/providers";
-import LoadCurrentMember from "@/components/LoadCurrentMember";
 import { cn } from "@/lib/utils";
 import { Geist } from "next/font/google";
 
@@ -25,7 +24,6 @@ export default function RootLayout({
         <Providers>
           <ApolloWrapper>
           <ToastContainer />
-            <LoadCurrentMember />
             {children}
           </ApolloWrapper>
         </Providers>

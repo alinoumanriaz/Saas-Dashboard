@@ -95,6 +95,9 @@ const TableBox = ({
   height,
   customRenderers = {},
 }: IProps) => {
+  if(edithandler){
+    console.log(data)
+  }
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: "asc" | "desc";

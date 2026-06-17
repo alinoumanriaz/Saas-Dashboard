@@ -1,20 +1,52 @@
 "use client";
 import React, { ChangeEvent, useState, useCallback, useEffect } from "react";
 import axios from "axios";
-import Popup from "../Popup";
 import Image from "next/image";
-import { RxCross2 } from "react-icons/rx";
-import { TiTick } from "react-icons/ti";
-import {
-  FiUpload,
-  FiImage,
-  FiTrash2,
-  FiSend,
-  FiChevronLeft,
-  FiChevronRight,
-} from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
-import LoaderSpin from "@/components/LoaderSpin";
+import {
+  Upload,
+  Image as ImageIcon,
+  Trash2,
+  Send,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Loader2,
+  Check,
+  FileImage,
+  AlertCircle,
+} from "lucide-react";
+
+// shadcn/ui imports
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 interface IProps {
   onCancel: () => void;
@@ -46,12 +78,9 @@ const GalleryModel = ({ onCancel, onSentSelected, mode }: IProps) => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-
-  // Preview and Alt text state
-  const [currentPreviewIndex, setCurrentPreviewIndex] = useState<number>(0);
   const [altTexts, setAltTexts] = useState<{ [key: string]: string }>({});
 
-  // Fetch images with pagination (infinite scroll)
+  // Fetch images with pagination
   const fetchImages = useCallback(
     async (cursor: string | null = null) => {
       try {
@@ -63,7 +92,7 @@ const GalleryModel = ({ onCancel, onSentSelected, mode }: IProps) => {
 
         const response = await axios.get("/api/cloudinary", { params });
         setImages((prev) => [...prev, ...(response.data.images || [])]);
-      setNextCursor(response.data.next_cursor || null);
+        setNextCursor(response.data.next_cursor || null);
       } catch (err) {
         console.error(err);
         setError("Failed to fetch images.");
@@ -78,14 +107,6 @@ const GalleryModel = ({ onCancel, onSentSelected, mode }: IProps) => {
   useEffect(() => {
     if (activeTab === "gallery") fetchImages();
   }, [activeTab, fetchImages]);
-
-  // Infinite scroll handler
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
-    if (scrollTop + clientHeight >= scrollHeight - 50 && nextCursor && !loadingMore) {
-      fetchImages(nextCursor);
-    }
-  };
 
   // File upload
   const handleFileUpload = async (files: FileList | File[]) => {
@@ -122,7 +143,7 @@ const GalleryModel = ({ onCancel, onSentSelected, mode }: IProps) => {
 
         const response = await axios.post(CLOUDINARY_UPLOAD_URL, formData, {
           headers: { "Content-Type": "multipart/form-data" },
-          onUploadProgress: (progressEvent) => {
+          onUploadProgress: (progressEvent: any) => {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / (progressEvent.total || 1)
             );
@@ -172,17 +193,21 @@ const GalleryModel = ({ onCancel, onSentSelected, mode }: IProps) => {
   };
 
   // Image selection
-  const handleImageSelect = (image: CloudinaryImage) => {
+  const handleImageSelect = (image: CloudinaryImage, checked: boolean) => {
     if (mode === "array") {
-      setSelectedImages((prev) =>
-        prev.find((img) => img.secure_url === image.secure_url)
-          ? prev.filter((img) => img.secure_url !== image.secure_url)
-          : [...prev, image]
-      );
+      if (checked) {
+        setSelectedImages((prev) => [...prev, image]);
+      } else {
+        setSelectedImages((prev) =>
+          prev.filter((img) => img.secure_url !== image.secure_url)
+        );
+      }
     } else {
-      setSelectedImages((prev) =>
-        prev.length > 0 && prev[0].secure_url === image.secure_url ? [] : [image]
-      );
+      if (checked) {
+        setSelectedImages([image]);
+      } else {
+        setSelectedImages([]);
+      }
     }
   };
 
@@ -212,8 +237,6 @@ const GalleryModel = ({ onCancel, onSentSelected, mode }: IProps) => {
       alt: altTexts[img.public_id] || img.original_filename || "",
     }));
     onSentSelected(selectedUrls);
-    setSuccess(`${selectedUrls.length} images sent successfully!`);
-    setTimeout(() => setSuccess(null), 3000);
     onCancel();
   };
 
@@ -221,348 +244,388 @@ const GalleryModel = ({ onCancel, onSentSelected, mode }: IProps) => {
     setAltTexts((prev) => ({ ...prev, [publicId]: text }));
   };
 
-  const currentPreviewImage = selectedImages[currentPreviewIndex];
-  const currentAltText = currentPreviewImage
-    ? altTexts[currentPreviewImage.public_id] || ""
-    : "";
-
-  const navigatePreview = (direction: "prev" | "next") => {
-    if (direction === "prev") {
-      setCurrentPreviewIndex((prev) =>
-        prev > 0 ? prev - 1 : selectedImages.length - 1
-      );
-    } else {
-      setCurrentPreviewIndex((prev) =>
-        prev < selectedImages.length - 1 ? prev + 1 : 0
-      );
-    }
+  const isSelected = (image: CloudinaryImage) => {
+    return selectedImages.some((selected) => selected.secure_url === image.secure_url);
   };
 
   return (
-    <Popup>
-      <div className="bg-white rounded-xl w-[95%] h-[90%] md:w-[90%] xl:w-[95%] relative overflow-hidden shadow-2xl">
-        {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">Image Gallery</h2>
-          <button
-            onClick={onCancel}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-          >
-            <RxCross2 className="text-gray-600 size-5" />
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={() => onCancel()}>
+      <DialogContent className="max-w-7xl w-[95vw] h-[90vh] p-0 overflow-hidden flex flex-col">
+        <DialogHeader className="px-6 py-4 border-b">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <ImageIcon className="w-5 h-5" />
+              Image Gallery
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={onCancel}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogHeader>
 
-        {/* Status messages */}
+        {/* Status Messages */}
         <AnimatePresence>
-          {error && (
+          {(error || success) && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="absolute top-16 left-0 right-0 flex justify-center z-10"
+              className="absolute top-20 left-0 right-0 flex justify-center z-10 px-6"
             >
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-md text-sm">
-                {error}
-              </div>
-            </motion.div>
-          )}
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute top-16 left-0 right-0 flex justify-center z-10"
-            >
-              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded-md text-sm">
-                {success}
-              </div>
+              {error && (
+                <Alert variant="destructive" className="max-w-md">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              {success && (
+                <Alert className="max-w-md bg-green-50 border-green-200 text-green-800">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Tabs */}
-        <div className="flex justify-between items-center border-b border-gray-200">
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab("upload")}
-              className={`flex items-center px-6 py-3 text-sm font-medium ${
-                activeTab === "upload"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <FiUpload className="mr-2" /> Upload
-            </button>
-            <button
-              onClick={() => setActiveTab("gallery")}
-              className={`flex items-center px-6 py-3 text-sm font-medium ${
-                activeTab === "gallery"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <FiImage className="mr-2" /> Gallery
-            </button>
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "gallery" | "upload")}
+          className="flex-1 flex flex-col overflow-hidden"
+        >
+          <div className="flex justify-between items-center px-6 border-b">
+            <TabsList className="h-auto p-0 bg-transparent gap-1">
+              <TabsTrigger
+                value="upload"
+                className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Upload
+              </TabsTrigger>
+              <TabsTrigger
+                value="gallery"
+                className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2"
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                Gallery
+              </TabsTrigger>
+            </TabsList>
+
+            {selectedImages.length > 0 && (
+              <div className="flex gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleImageDelete}
+                        disabled={uploading}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete ({selectedImages.length})
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete selected images</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" onClick={handleSendImages}>
+                        <Send className="w-4 h-4 mr-2" />
+                        Send ({selectedImages.length})
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Send selected images</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
           </div>
 
-          {selectedImages.length > 0 && (
-            <div className="flex space-x-3 mr-4">
-              <button
-                onClick={handleImageDelete}
-                disabled={uploading}
-                className="flex items-center px-4 py-1.5 ring-1 ring-red-200 bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
-              >
-                {uploading ? (
-                  "loading..."
-                ) : (
-                  <>
-                    <FiTrash2 className="mr-2" /> Delete ({selectedImages.length})
-                  </>
-                )}
-              </button>
-              <button
-                onClick={handleSendImages}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                <FiSend className="mr-2" /> Send ({selectedImages.length})
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Main Content */}
-        <div className="h-[calc(100%-120px)] overflow-hidden">
-          {activeTab === "gallery" ? (
+          {/* Gallery Tab */}
+          <TabsContent value="gallery" className="flex-1 overflow-hidden m-0">
             <div className="flex h-full">
-              {/* Left - Gallery */}
+              {/* Images Grid */}
               <div
                 className={`${
                   selectedImages.length > 0 ? "w-[70%]" : "w-full"
-                } overflow-y-auto p-4`}
-                onScroll={handleScroll}
+                } overflow-hidden`}
               >
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {loading ? (
-                    <div className="col-span-full flex justify-center items-center h-64">
-                      <LoaderSpin color="text-blue-500" />
+                <ScrollArea className="h-full">
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {loading ? (
+                        <div className="col-span-full flex justify-center items-center h-64">
+                          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                        </div>
+                      ) : images.length === 0 ? (
+                        <div className="col-span-full text-center py-12">
+                          <Card>
+                            <CardContent className="pt-12 pb-8">
+                              <FileImage className="w-12 h-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+                              <p className="text-muted-foreground">No images found</p>
+                              <Button
+                                variant="link"
+                                onClick={() => setActiveTab("upload")}
+                                className="mt-2"
+                              >
+                                Upload some images
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      ) : (
+                        images.map((img, index) => (
+                          <Card
+                            key={`${img.public_id}-${index}`}
+                            className="group relative overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                          >
+                            <CardContent className="p-0">
+                              <div className="relative aspect-square">
+                                <Image
+                                  src={img.secure_url}
+                                  alt={altTexts[img.public_id] || img.original_filename}
+                                  fill
+                                  className="object-cover"
+                                />
+                                <div
+                                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() =>
+                                    handleImageSelect(img, !isSelected(img))
+                                  }
+                                />
+                                <div className="absolute top-2 left-2">
+                                  <Checkbox
+                                    checked={isSelected(img)}
+                                    onCheckedChange={(checked) =>
+                                      handleImageSelect(img, checked as boolean)
+                                    }
+                                    className="bg-white"
+                                  />
+                                </div>
+                                {altTexts[img.public_id] && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="absolute bottom-2 left-2 text-xs"
+                                  >
+                                    Alt
+                                  </Badge>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
                     </div>
-                  ) : images.length === 0 ? (
-                    <div className="col-span-full text-center text-gray-500 py-12">
-                      <FiImage className="size-12 mb-4 opacity-50 mx-auto" />
-                      <p className="text-lg">No images found</p>
-                      <button
-                        onClick={() => setActiveTab("upload")}
-                        className="mt-4 text-blue-600 hover:text-blue-800"
-                      >
-                        Upload some images
-                      </button>
-                    </div>
-                  ) : (
-                    images.map((img, index) => (
-                      <div key={`${img.public_id}-${index}`} className="rounded shadow-md relative group">
-                        <label htmlFor={img.public_id} className="cursor-pointer">
-                          <input
-                            type="checkbox"
-                            id={img.public_id}
-                            checked={selectedImages.some(
-                              (selected) => selected.secure_url === img.secure_url
-                            )}
-                            onChange={() => handleImageSelect(img)}
-                            className="peer hidden"
-                          />
-                          <div className="absolute top-1 right-1 w-5 h-5 bg-white border-2 border-gray-300 flex justify-center items-center rounded opacity-0 peer-checked:opacity-100 peer-checked:border-blue-600 peer-checked:bg-blue-600 transition">
-                            <TiTick className="size-6 text-white" />
-                          </div>
-                          <Image
-                            src={img.secure_url}
-                            alt={altTexts[img.public_id] || img.original_filename || "gallery image"}
-                            width={300}
-                            height={300}
-                            loading="lazy"
-                            className="w-full h-48 object-cover rounded"
-                          />
-                          {altTexts[img.public_id] && (
-                            <div className="absolute bottom-1 left-1 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                              Alt Text
-                            </div>
-                          )}
-                        </label>
-                      </div>
-                    ))
-                  )}
-                </div>
 
-                {loadingMore && (
-                  <div className="text-center mt-4 text-gray-500">
-                    Loading more images...
+                    {loadingMore && (
+                      <div className="text-center py-4">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500" />
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Loading more...
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </ScrollArea>
               </div>
 
-              {/* Right - Preview Panel */}
+              {/* Preview Panel */}
               {selectedImages.length > 0 && (
-                <div className="w-[30%] border-l border-gray-200 bg-gray-50 flex flex-col">
-                  <div className="p-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Image Preview ({currentPreviewIndex + 1}/{selectedImages.length})
+                <div className="w-[30%] border-l bg-muted/30 flex flex-col">
+                  <div className="p-4 border-b">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" />
+                      Preview ({selectedImages.length})
                     </h3>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-4">
-                    {selectedImages.length > 1 && (
-                      <div className="flex justify-between items-center mb-4">
-                        <button
-                          onClick={() => navigatePreview("prev")}
-                          className="p-2 rounded-full hover:bg-gray-200 transition-colors"
-                        >
-                          <FiChevronLeft className="size-5" />
-                        </button>
-                        <span className="text-sm text-gray-600">
-                          Image {currentPreviewIndex + 1} of {selectedImages.length}
-                        </span>
-                        <button
-                          onClick={() => navigatePreview("next")}
-                          className="p-2 rounded-full hover:bg-gray-200 transition-colors"
-                        >
-                          <FiChevronRight className="size-5" />
-                        </button>
-                      </div>
-                    )}
-
-                    {currentPreviewImage && (
-                      <>
-                        <div className="flex justify-center mb-4">
-                          <Image
-                            src={currentPreviewImage.secure_url}
-                            alt={currentAltText || "Preview"}
-                            width={300}
-                            height={300}
-                            className="rounded-md w-full h-48 object-contain bg-white"
-                          />
-                        </div>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">
-                              Filename
-                            </label>
-                            <p className="text-sm text-gray-600 truncate">
-                              {currentPreviewImage.original_filename}
-                            </p>
-                          </div>
-
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">
-                              Alt Text
-                            </label>
-                            <input
-                              type="text"
-                              value={currentAltText}
-                              onChange={(e) =>
-                                handleAltTextChange(currentPreviewImage.public_id, e.target.value)
-                              }
-                              placeholder="Enter alt text for this image..."
-                              className="border border-gray-300 rounded-md p-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                              This alt text will be used for accessibility and SEO
-                            </p>
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Quick navigation */}
-                    {selectedImages.length > 1 && (
-                      <div className="mt-3">
-                        <label className="text-sm font-medium text-gray-700 mb-2 block">
-                          Quick Navigation
-                        </label>
-                        <div className="grid grid-cols-4 gap-2 max-h-24 overflow-y-auto">
-                          {selectedImages.map((img, index) => (
-                            <button
-                              key={img.public_id}
-                              onClick={() => setCurrentPreviewIndex(index)}
-                              className={`relative border-2 rounded-md overflow-hidden ${
-                                index === currentPreviewIndex ? "border-blue-500" : "border-gray-300"
-                              }`}
-                            >
-                              <Image src={img.secure_url} alt="" width={60} height={60} className="w-full h-12 object-cover" />
-                              {altTexts[img.public_id] && (
-                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-[8px] p-0.5 text-center">
-                                  Alt
-                                </div>
-                              )}
-                            </button>
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-4">
+                      <Carousel className="w-full">
+                        <CarouselContent>
+                          {selectedImages.map((img, idx) => (
+                            <CarouselItem key={img.public_id}>
+                              <Card>
+                                <CardContent className="p-4">
+                                  <div className="relative aspect-video mb-4">
+                                    <Image
+                                      src={img.secure_url}
+                                      alt={altTexts[img.public_id] || "Preview"}
+                                      fill
+                                      className="object-contain rounded-md"
+                                    />
+                                  </div>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <Label className="text-xs text-muted-foreground">
+                                        Filename
+                                      </Label>
+                                      <p className="text-sm font-mono truncate">
+                                        {img.original_filename}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <Label htmlFor={`alt-${img.public_id}`}>
+                                        Alt Text
+                                      </Label>
+                                      <Input
+                                        id={`alt-${img.public_id}`}
+                                        value={altTexts[img.public_id] || ""}
+                                        onChange={(e) =>
+                                          handleAltTextChange(img.public_id, e.target.value)
+                                        }
+                                        placeholder="Enter alt text for accessibility..."
+                                        className="mt-1"
+                                      />
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Improves accessibility and SEO
+                                      </p>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </CarouselItem>
                           ))}
+                        </CarouselContent>
+                        {selectedImages.length > 1 && (
+                          <>
+                            <CarouselPrevious className="left-2" />
+                            <CarouselNext className="right-2" />
+                          </>
+                        )}
+                      </Carousel>
+
+                      {/* Thumbnail Navigation */}
+                      {selectedImages.length > 1 && (
+                        <div>
+                          <Label className="text-sm mb-2 block">Quick Navigation</Label>
+                          <div className="grid grid-cols-4 gap-2">
+                            {selectedImages.map((img, idx) => (
+                              <button
+                                key={img.public_id}
+                                onClick={() => {
+                                  const carousel = document.querySelector(
+                                    "[data-carousel]"
+                                  ) as any;
+                                  if (carousel?.scrollTo) {
+                                    carousel.scrollTo(idx);
+                                  }
+                                }}
+                                className="relative aspect-square rounded-md overflow-hidden border-2 border-transparent hover:border-blue-500 transition-colors"
+                              >
+                                <Image
+                                  src={img.secure_url}
+                                  alt=""
+                                  fill
+                                  className="object-cover"
+                                />
+                                {altTexts[img.public_id] && (
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[8px] p-0.5 text-center">
+                                    Alt
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  </ScrollArea>
                 </div>
               )}
             </div>
-          ) : (
-            // Upload Section
+          </TabsContent>
+
+          {/* Upload Tab */}
+          <TabsContent value="upload" className="flex-1 m-0">
             <div
               className={`h-full flex items-center justify-center p-6 transition-colors ${
-                isDragging ? "bg-blue-50" : "bg-gray-50"
+                isDragging ? "bg-blue-50" : "bg-muted/30"
               }`}
               onDragEnter={handleDragEnter}
               onDragLeave={handleDragLeave}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
             >
-              <div className="text-center max-w-md">
-                <div
-                  className={`border-2 border-dashed rounded-xl p-8 transition-all ${
-                    isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-300"
-                  }`}
-                >
-                  <FiUpload className={`mx-auto size-12 mb-4 transition-colors ${isDragging ? "text-blue-500" : "text-gray-400"}`} />
-                  <h3 className="text-lg font-medium text-gray-900 mb-1">
-                    {isDragging ? "Drop to upload" : "Drag & drop images here"}
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">or</p>
-                  <label
-                    htmlFor="cloudinary-upload"
-                    className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      uploading ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+              <Card className="max-w-md w-full">
+                <CardContent className="pt-8 pb-6">
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+                      isDragging
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-border hover:border-blue-300"
                     }`}
                   >
-                    {uploading ? `Uploading... (${uploadProgress}%)` : "Select Files"}
-                  </label>
-                  <input
-                    id="cloudinary-upload"
-                    type="file"
-                    multiple
-                    accept="image/jpeg, image/png, image/webp, image/svg+xml"
-                    onChange={handleInputChange}
-                    disabled={uploading}
-                    className="hidden"
-                  />
-                  <p className="mt-4 text-xs text-gray-500">Supports JPEG, PNG up to 10MB each</p>
-                </div>
-
-                {uploading && (
-                  <div className="mt-6 w-full">
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Progress</span>
-                      <span>{uploadProgress}%</span>
+                    <Upload
+                      className={`mx-auto w-12 h-12 mb-4 transition-colors ${
+                        isDragging ? "text-blue-500" : "text-muted-foreground"
+                      }`}
+                    />
+                    <h3 className="text-lg font-medium mb-1">
+                      {isDragging ? "Drop to upload" : "Drag & drop images here"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">or</p>
+                    <div className="relative">
+                      <Button
+                        variant="default"
+                        disabled={uploading}
+                        className="relative"
+                        onClick={() =>
+                          document.getElementById("cloudinary-upload")?.click()
+                        }
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading... ({uploadProgress}%)
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Select Files
+                          </>
+                        )}
+                      </Button>
+                      <input
+                        id="cloudinary-upload"
+                        type="file"
+                        multiple
+                        accept="image/jpeg, image/png, image/webp, image/svg+xml"
+                        onChange={handleInputChange}
+                        disabled={uploading}
+                        className="hidden"
+                      />
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      ></div>
-                    </div>
+                    <p className="mt-4 text-xs text-muted-foreground">
+                      Supports JPEG, PNG, WebP, SVG up to 10MB each
+                    </p>
                   </div>
-                )}
-              </div>
+
+                  {uploading && (
+                    <div className="mt-6 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Uploading...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <Progress value={uploadProgress} className="h-2" />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          )}
-        </div>
-      </div>
-    </Popup>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 };
 

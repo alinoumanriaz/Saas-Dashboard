@@ -1,10 +1,9 @@
 "use client";
-import { useEffect, useReducer, useState } from "react";
-import { BiSearch } from "react-icons/bi";
+import { useReducer, useState } from "react";
 import TableBox from "@/components/tablebox/TableBox";
 import Container from "@/components/Container";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { DELETE_MODULES, GET_PAGINATED_MODULES } from "@/graphql/query/module.query";
+import { DELETE_CUSTOM_MODULES, GET_PAGINATED_CUSTOM_MODULES } from "@/graphql/query/module.query";
 import {
   filterReducer,
   initialFilterState,
@@ -14,67 +13,16 @@ import { toast } from "react-toastify";
 import AddModule from "@/components/popup/models/AddModule.model";
 import { useAppSelector } from "@/redux/hooks";
 import { PlatformRole } from "@/enums/common.enums";
-import { Module, ModuleStatus } from "@/Types/module.types";
+import { Module } from "@/Types/module.types";
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  FilterX, 
-  RefreshCw, 
-  ListFilter, 
-  Calendar, 
-  MapPin, 
-  Users, 
-  Ticket, 
-  Clock,
-  TrendingUp
-} from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+  RefreshCw,
+  Calendar,
+} from "lucide-react";
+import { getLucideIcon } from "@/helpers/LucidIconFinder";
 
 const ITEMS_PER_PAGE = 10;
-
-// Event filter reducer
-// const filterReducer = (state: any, action: any) => {
-//   switch (action.type) {
-//     case "SET_PAGE":
-//       return { ...state, currentPage: action.payload };
-//     case "SET_STATUS":
-//       return { ...state, status: action.payload, currentPage: 1 };
-//     case "SET_CATEGORY":
-//       return { ...state, category: action.payload, currentPage: 1 };
-//     case "SET_EVENT_TYPE":
-//       return { ...state, eventType: action.payload, currentPage: 1 };
-//     case "SET_SEARCH":
-//       return { ...state, searchText: action.payload, currentPage: 1 };
-//     case "RESET_FILTERS":
-//       return {
-//         ...state,
-//         status: undefined,
-//         category: undefined,
-//         eventType: undefined,
-//         searchText: "",
-//         currentPage: 1,
-//       };
-//     default:
-//       return state;
-//   }
-// };
-
-// const initialFilterState = {
-//   currentPage: 1,
-//   status: undefined,
-//   category: undefined,
-//   eventType: undefined,
-//   searchText: "",
-// };
 
 const Page = () => {
   const currentMember = useAppSelector((state) => state.currentMember.member);
@@ -85,39 +33,32 @@ const Page = () => {
   const [showAddModel, setShowAddModel] = useState(false);
   const [selectedIdsForDeletion, setSelectedIdsForDeletion] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
 
   const isSuperAdmin = currentMember?.role === PlatformRole.SUPER_ADMIN;
   const isAdmin = currentMember?.role === PlatformRole.ADMIN;
 
-  const { data, loading, error, refetch } = useQuery<any>(GET_PAGINATED_MODULES, {
+  const { data, loading, error, refetch } = useQuery<any>(GET_PAGINATED_CUSTOM_MODULES, {
     variables: {
       page: 1,
       limit: Number(ITEMS_PER_PAGE) || 10,
-      status: null,
-      category: null,
-      search: null,
     },
     fetchPolicy: "network-only",
   });
 
-  const [deleteModules] = useMutation<any>(DELETE_MODULES);
+  console.log({ dataa: data })
 
-  const allModules: Module[] = data?.getPaginatedModules?.modules || [];
-  const totalModules = data?.getPaginatedModules?.totalModulesCount || 0;
+  const [deleteCustomModules] = useMutation<any>(DELETE_CUSTOM_MODULES);
+
+  const allModules: Module[] = data?.getPaginatedCustomModules?.customModules || [];
+  const totalModules = data?.getPaginatedCustomModules?.totalCustomModulesCount || 0;
   const totalPages = Math.ceil(totalModules / ITEMS_PER_PAGE);
 
 
   const tableData = allModules.map(module => ({
     ...module,
-    moduleName: module.title,
-    date: `${new Date(module.startDate).toLocaleDateString()} - ${new Date(module.endDate).toLocaleDateString()}`,
-    time: `${module.startTime} - ${module.endTime}`,
-    attendees: module.attendees?.length || 0,
-    capacity: module.capacity || "-",
   }));
 
-  const columns = ["moduleName", "date", "location", "attendees", "capacity"];
+  const columns = ["moduleName", "route"];
 
   const cancelDelete = () => {
     setSelectedIdsForDeletion([]);
@@ -134,17 +75,17 @@ const Page = () => {
     }
 
     try {
-      const { data } = await deleteModules({
+      const { data } = await deleteCustomModules({
         variables: { ids: selectedIdsForDeletion },
       });
 
-      if (data?.deleteModules?.success) {
-        toast.success(data.deleteModules.message);
+      if (data?.deleteCustomModules?.success) {
+        toast.success(data.deleteCustomModules.message);
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
       } else {
-        toast.error(data?.deleteModules?.message || "Failed to delete modules");
+        toast.error(data?.deleteCustomModules?.message || "Failed to delete modules");
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to delete modules");
@@ -174,7 +115,7 @@ const Page = () => {
     setShowAddModel(true);
   };
 
-  const cancelAddEvent = () => {
+  const cancelAddModule = () => {
     setShowAddModel(false);
   };
 
@@ -229,7 +170,7 @@ const Page = () => {
           {/* Main Table */}
           {error ? (
             <div className="p-4 text-red-500 bg-red-50 rounded-lg">
-              <div className="font-semibold">Error loading events</div>
+              <div className="font-semibold">Error loading modules</div>
               <div className="text-sm mt-1">{error.message}</div>
               <button
                 onClick={() => refetch()}
@@ -254,28 +195,27 @@ const Page = () => {
                 deletehandler={deleteHandler}
                 edithandler={editHandler}
                 height="max-h-[calc(100vh-380px)]"
-                status={true}
+                status={false}
                 createdAt={true}
                 updatedAt={true}
                 customRenderers={{
-                  eventName: (value, row) => (
-                    <div>
-                      <div className="font-medium text-gray-900">{value}</div>
-                      <div className="text-xs text-gray-500">{row.description?.substring(0, 50)}...</div>
-                    </div>
-                  ),
-                  location: (value, row) => (
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3 text-gray-400" />
-                      <span>{value || "Virtual"}</span>
-                    </div>
-                  ),
-                  attendees: (value) => (
-                    <div className="flex items-center gap-1">
-                      <Users className="h-3 w-3 text-gray-400" />
-                      <span>{value}</span>
-                    </div>
-                  ),
+                  moduleName: (value, row) => {
+                    const Icon = getLucideIcon(row.moduleIcon);
+
+                    return (
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                          <Icon className="size-4 text-muted-foreground" />
+                        </div>
+
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {value}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  },
                 }}
               />
             </div>
@@ -297,16 +237,16 @@ const Page = () => {
       )}
 
       {/* Add/Edit Event Modal */}
-      {/* {showAddModel && (
+      {showAddModel && (
         <AddModule
-          onCancel={cancelledModules}
+          onCancel={cancelAddModule}
           selectedData={selectedData}
           isEditMode={isEditMode}
           refetch={refetch}
           currentMemberId={currentMember?.id}
           isSuperAdmin={isSuperAdmin}
         />
-      )} */}
+      )}
     </Container>
   );
 };
