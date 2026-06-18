@@ -39,6 +39,7 @@ const LoadCurrentMember = ({ children }: LoadCurrentMemberProps) => {
 
   // Optionally handle errors (e.g., show an error message)
   if (error) {
+    console.log(error)
     // You could redirect to login or show an error overlay
     return <div>Error loading member. Please refresh.</div>;
   }

@@ -27,14 +27,15 @@ export const DELETE_CUSTOM_MODULES = gql`
   }
 `;
 
-export const GET_CUSTOM_MODULES = gql`
-  query GetCustomModules($filter: ModuleFilterInput) {
-    getCustomModules(filter: $filter) {
+export const GET_ALL_CUSTOM_MODULES = gql`
+  query GetAllCustomModules {
+    getAllCustomModules {
       id
       moduleName
       route
       description
       moduleIcon
+      moduleType
       status
       parentModule
       order
@@ -56,6 +57,7 @@ export const GET_PAGINATED_CUSTOM_MODULES = gql`
         route
         description
         moduleIcon
+        moduleType
         status
         parentModule
         order
@@ -69,3 +71,12 @@ export const GET_PAGINATED_CUSTOM_MODULES = gql`
     }
   }
 `;
+
+export const UPDATE_ALL_MEMBER_CUSTOM_MODULES = gql`
+  mutation UpdateAllMemberCustomModules($id: String!, $field: String!, $value: Boolean!){
+    updateAllMemberCustomModules(id: $id, field: $field, value: $value){
+      success
+      message
+    }
+  }
+`

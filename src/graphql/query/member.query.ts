@@ -32,8 +32,15 @@ export const GET_PAGINATED_MEMBERS = gql`
           paymentMethod
         }
         modules {
-          name
-          canAccess
+          moduleId {
+            id
+            moduleName
+            route
+            moduleIcon
+            description
+            status
+          }
+          isActive
           permissions
         }
         address {
@@ -112,8 +119,15 @@ export const GET_CURRENT_MEMBER = gql`
         role
         isVerified
         modules {
-          name
-          canAccess
+          moduleId {
+            id
+            moduleName
+            route
+            moduleIcon
+            description
+            status
+          }
+          isActive
           permissions
         }
         subscription {
@@ -183,8 +197,8 @@ export const GET_MEMBER_PROFILE = gql`
         country
       }
       modules {
-        name
-        canAccess
+        moduleId
+        isActive
         permissions
       }
       subscription {

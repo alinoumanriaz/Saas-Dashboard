@@ -3,7 +3,7 @@ import { useReducer, useState } from "react";
 import TableBox from "@/components/tablebox/TableBox";
 import Container from "@/components/Container";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { DELETE_CUSTOM_MODULES, GET_PAGINATED_CUSTOM_MODULES } from "@/graphql/query/module.query";
+import { DELETE_CUSTOM_MODULES, GET_PAGINATED_CUSTOM_MODULES, UPDATE_ALL_MEMBER_CUSTOM_MODULES } from "@/graphql/query/module.query";
 import {
   filterReducer,
   initialFilterState,
@@ -21,11 +21,15 @@ import {
   Calendar,
 } from "lucide-react";
 import { getLucideIcon } from "@/helpers/LucidIconFinder";
+import { Field } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
 
 const ITEMS_PER_PAGE = 10;
 
 const Page = () => {
   const currentMember = useAppSelector((state) => state.currentMember.member);
+  const [toggleOverrides, setToggleOverrides] = useState<Record<string, boolean>>({});
+  const [loadingSwitches, setLoadingSwitches] = useState<Record<string, boolean>>({});
   const [state, dispatch] = useReducer(filterReducer, initialFilterState);
   const [selectedData, setSelectedData] = useState<any | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -37,6 +41,9 @@ const Page = () => {
   const isSuperAdmin = currentMember?.role === PlatformRole.SUPER_ADMIN;
   const isAdmin = currentMember?.role === PlatformRole.ADMIN;
 
+  const [deleteCustomModules] = useMutation<any>(DELETE_CUSTOM_MODULES);
+  const [updateAllMemberCustomModules] = useMutation<any>(UPDATE_ALL_MEMBER_CUSTOM_MODULES);
+
   const { data, loading, error, refetch } = useQuery<any>(GET_PAGINATED_CUSTOM_MODULES, {
     variables: {
       page: 1,
@@ -47,8 +54,6 @@ const Page = () => {
 
   console.log({ dataa: data })
 
-  const [deleteCustomModules] = useMutation<any>(DELETE_CUSTOM_MODULES);
-
   const allModules: Module[] = data?.getPaginatedCustomModules?.customModules || [];
   const totalModules = data?.getPaginatedCustomModules?.totalCustomModulesCount || 0;
   const totalPages = Math.ceil(totalModules / ITEMS_PER_PAGE);
@@ -58,7 +63,7 @@ const Page = () => {
     ...module,
   }));
 
-  const columns = ["moduleName", "route"];
+  const columns = ["moduleName", "superAdmin", "owner", "admin"];
 
   const cancelDelete = () => {
     setSelectedIdsForDeletion([]);
@@ -75,9 +80,11 @@ const Page = () => {
     }
 
     try {
-      const { data } = await deleteCustomModules({
+      const { data, error } = await deleteCustomModules({
         variables: { ids: selectedIdsForDeletion },
       });
+
+      console.log({deleteerror:error})
 
       if (data?.deleteCustomModules?.success) {
         toast.success(data.deleteCustomModules.message);
@@ -118,6 +125,43 @@ const Page = () => {
   const cancelAddModule = () => {
     setShowAddModel(false);
   };
+
+  const handleToggleDefault = async (
+  moduleId: string,
+  field: string,
+  newValue: boolean
+) => {
+  const key = `${moduleId}-${field}`;
+
+  setLoadingSwitches((prev) => ({ ...prev, [key]: true }));
+
+  setToggleOverrides((prev) => ({
+    ...prev,
+    [key]: newValue,
+  }));
+
+  try {
+    await updateAllMemberCustomModules({
+      variables: {
+        id: moduleId,
+        field,
+        value: newValue,
+      },
+    });
+
+    // toast.success(`${field} updated successfully`);
+    // refetch();
+  } catch (err: any) {
+    setToggleOverrides((prev) => ({
+      ...prev,
+      [key]: !newValue,
+    }));
+
+    toast.error(err.message || "Failed to update module");
+  } finally {
+    setLoadingSwitches((prev) => ({ ...prev, [key]: false }));
+  }
+};
 
 
 
@@ -196,8 +240,8 @@ const Page = () => {
                 edithandler={editHandler}
                 height="max-h-[calc(100vh-380px)]"
                 status={false}
-                createdAt={true}
-                updatedAt={true}
+                createdAt={false}
+                updatedAt={false}
                 customRenderers={{
                   moduleName: (value, row) => {
                     const Icon = getLucideIcon(row.moduleIcon);
@@ -212,10 +256,63 @@ const Page = () => {
                           <div className="font-medium text-gray-900">
                             {value}
                           </div>
+                          <div className=" text-gray-400">
+                            {row.route}
+                          </div>
                         </div>
                       </div>
                     );
                   },
+                  superAdmin: (value, row) => {
+                    return (
+                      <Field orientation="horizontal" data-disabled className="w-fit">
+                        <Switch
+                          checked={
+                            toggleOverrides[`${row.id}-isDefaultForSuperAdmin`] ??
+                            row.isDefaultForSuperAdmin
+                          }
+                          disabled={loadingSwitches[`${row.id}-isDefaultForSuperAdmin`]}
+                          onCheckedChange={(checked) =>
+                            handleToggleDefault(row.id, "isDefaultForSuperAdmin", checked)
+                          }
+                          id="switch-disabled-unchecked" />
+                      </Field>
+                    )
+                  },
+                  admin: (value, row) => {
+                    return (
+                      <Field orientation="horizontal" data-disabled className="w-fit">
+                        <Switch
+                          checked={
+                            toggleOverrides[`${row.id}-isDefaultForAdmin`] ??
+                            row.isDefaultForAdmin
+                          }
+                          disabled={loadingSwitches[`${row.id}-isDefaultForAdmin`]}
+                          onCheckedChange={(checked) =>
+                            handleToggleDefault(row.id, "isDefaultForAdmin", checked)
+                          }
+                          id="switch-disabled-unchecked"
+                        />
+                      </Field>
+                    )
+                  },
+                  owner: (value, row) => {
+                    return (
+                      <Field orientation="horizontal" data-disabled className="w-fit">
+                        <Switch
+                          checked={
+                            toggleOverrides[`${row.id}-isDefaultForOwner`] ??
+                            row.isDefaultForOwner
+                          }
+                          disabled={loadingSwitches[`${row.id}-isDefaultForOwner`]}
+                          onCheckedChange={(checked) =>
+                            handleToggleDefault(row.id, "isDefaultForOwner", checked)
+                          }
+                          id="switch-disabled-unchecked"
+                        />
+                      </Field>
+                    )
+                  }
                 }}
               />
             </div>

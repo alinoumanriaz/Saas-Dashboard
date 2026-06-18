@@ -9,7 +9,8 @@ import Link from "next/link";
 import WebsiteDropdown from "../dropdown/WebsiteDropdown";
 import { GET_WEBSITES_BY_COMPANY_ID } from "@/graphql/query/website.query";
 import { WebsiteSwitcher } from "../website-switcher";
-import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon } from "lucide-react";
+import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, Ellipsis } from "lucide-react";
+import { Button } from "../ui/button";
 
 const AdminHeader = () => {
   const [userDropdown, setUserDropdown] = useState(false);
@@ -93,7 +94,12 @@ const AdminHeader = () => {
   return (
     <div className="sticky top-0 z-50 w-full flex justify-between items-center text-sm py-2 pr-4 px-2">
       <div className="flex justify-center items-center space-x-3">
-        <WebsiteSwitcher websites={websites} />
+        {
+          (currentMember?.role === "SUPER_ADMIN" ) ?
+          <></>
+          :
+          <WebsiteSwitcher websites={websites} />
+        }
       </div>
 
       <div className="relative">
@@ -101,6 +107,10 @@ const AdminHeader = () => {
           <div className="pl-2 hidden md:flex flex-col text-black">
             <div className="font-medium capitalize">{selectedCompanyMember?.role}</div>
           </div>
+
+          <Button variant="outline">
+            <Ellipsis />
+          </Button>
 
         </div>
       </div>

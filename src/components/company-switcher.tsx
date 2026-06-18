@@ -19,17 +19,16 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 
+
 export function CompanySwitcher({
   companies,
 }: {
-  companies: {
-    name: string
-    logo: React.ReactNode
-    plan: string
-  }[]
+  companies: any[]
 }) {
+  console.log({allcompanies:companies})
   const { isMobile } = useSidebar()
-  const [activeCompany, setActiveCompany] = React.useState(companies[0])
+  const [activeCompany, setActiveCompany] = React.useState<any>(companies[0])
+  console.log({activeCompany:activeCompany})
 
   if (!activeCompany) {
     return null
@@ -48,8 +47,8 @@ export function CompanySwitcher({
                 {activeCompany.logo}
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{activeCompany.name}</span>
-                <span className="truncate text-xs">{activeCompany.plan}</span>
+                <span className="truncate font-medium">{activeCompany.company.name}</span>
+                {/* <span className="truncate text-xs">{activeCompany.plan}</span> */}
               </div>
               <ChevronsUpDownIcon className="ml-auto" />
             </SidebarMenuButton>
