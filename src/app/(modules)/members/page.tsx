@@ -31,6 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "@/helpers/getInitials";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -91,7 +93,7 @@ const Page = () => {
     avatar: member.avatar,
   }));
 
-  const columns = ["phone", "role"];
+  const columns = ["member", "phone", "role"];
 
   const cancelDelete = () => {
     setSelectedIdsForDeleteion([]);
@@ -235,11 +237,11 @@ const Page = () => {
               </Button>
             </div>
           </div>
-          
+
 
           {/* Filter Section - Toggle visibility */}
           {showFilters && (
-            <Card className=" animate-in slide-in-from-top-2 duration-200 ring-0">
+            <Card className=" animate-in bg-background slide-in-from-top-2 duration-200 ring-0">
               <div className=" w-full">
                 <div className="w-full flex justify-start items-center gap-2">
 
@@ -256,7 +258,7 @@ const Page = () => {
                         type="text"
                         value={searchText}
                       />
-                      <BiSearch className="absolute left-2 top-1/2 size-5 transform -translate-y-1/2 text-gray-400" />
+                      <BiSearch className="absolute left-2 top-1/2 size-5 transform -translate-y-1/2 " />
                     </div>
                   </div>
 
@@ -313,9 +315,6 @@ const Page = () => {
                       </SelectContent>
                     </Select>
                   </div>
-
-
-
                 </div>
               </div>
             </Card>
@@ -390,7 +389,6 @@ const Page = () => {
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
               <TableBox
                 column={columns}
                 checkbox={true}
@@ -402,17 +400,38 @@ const Page = () => {
                 setCurrentPage={(page) =>
                   dispatch({ type: "SET_PAGE", payload: page })
                 }
-                member={true}
                 MemberStatus={true}
                 subscription={true}
                 isVerified={true}
                 deletehandler={deleteHandler}
                 edithandler={editHandler}
                 height="max-h-[calc(100vh-380px)]"
-                createdAt={true}
+                createdAt={false}
                 updatedAt={true}
+                customRenderers={{
+                  member: (value, row) => {
+                    return (
+                      <div className="flex items-center gap-1">
+                        <div className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                          <Avatar className="h-8 w-8 rounded-lg">
+                            <AvatarImage src={row.avatar} alt={row.username} />
+                            <AvatarFallback className="rounded-lg h-8 w-8">{getInitials(row.username)}</AvatarFallback>
+                          </Avatar>
+                        </div>
+
+                        <div>
+                          <div className="font-medium ">
+                            {row.username}
+                          </div>
+                          <div className=" text-gray-400">
+                            {row.email}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                }}
               />
-            </div>
           )}
         </div>
       </div>

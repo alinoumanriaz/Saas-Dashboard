@@ -16,6 +16,8 @@ import { NavCompanyManagement } from "./nav-company-management"
 import { NavWebsite } from "./nav-website"
 import { useQuery } from "@apollo/client/react"
 import { GET_COMPANIES_OF_CURRENT_MEMBER_BY_ID } from "@/graphql/query/company-member.query"
+import { Skeleton } from "./ui/skeleton"
+import { NavAppManagement } from "./nav-app-management"
 
 // This is sample data.
 const dataa = {
@@ -180,29 +182,31 @@ const dataa = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const currentMember = useAppSelector((state) => state.currentMember.member);
   const { data, loading, error } = useQuery<any>(
-      GET_COMPANIES_OF_CURRENT_MEMBER_BY_ID,
-      {
-        variables: {
-          id: currentMember?.id,
-        },
-        skip: !currentMember,
-        fetchPolicy: "network-only", // Add this to ensure fresh data
-      }
-    );
-    const currentCompaniesOfLogedInMember = data?.getCompaniesOfCurrentMemberById || [];
-    console.log({currentCompaniesOfLogedInMember:currentCompaniesOfLogedInMember})
+    GET_COMPANIES_OF_CURRENT_MEMBER_BY_ID,
+    {
+      variables: {
+        id: currentMember?.id,
+      },
+      skip: !currentMember || currentMember?.role === "SUPER_ADMIN",
+      fetchPolicy: "network-only", // Add this to ensure fresh data
+    }
+  );
+  const currentCompaniesOfLogedInMember = data?.getCompaniesOfCurrentMemberById?.companyMembers || [];
+  console.log({ currentCompaniesOfLogedInMember: data })
+  console.log({ currentCompaniesOfLogedInMember: error })
+  console.log({ sidebarCurrentMember: currentMember?.modules })
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+      <SidebarHeader className="mt-2">
         {
-         (currentMember?.role === "SUPER_ADMIN" ) ?
+          (currentMember?.role === "SUPER_ADMIN") ?
             <div
               className="flex px-0 py-2 gap-x-3 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage src={currentMember.avatar || "/avatars/shadcn.jpg"} alt={currentMember.username} />
-                <AvatarFallback>ER</AvatarFallback>
+                <AvatarFallback>SA</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{currentMember?.username}</span>
@@ -210,14 +214,28 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </div>
             </div>
             :
-            <CompanySwitcher companies={currentCompaniesOfLogedInMember?.companyMembers} />
+            loading ? (
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-37.5" />
+                  <Skeleton className="h-4 w-37.5" />
+                </div>
+              </div>
+            )
+              :
+              <CompanySwitcher companyMembers={currentCompaniesOfLogedInMember} />
         }
       </SidebarHeader>
       <SidebarContent>
         {/* <NavMain items={data.navMain} /> */}
-        <NavWebsite items={dataa.navMain} />
-        <NavCompanyManagement details={dataa.projects}/>
+        {/* <NavWebsite items={dataa.navMain} />
+        <NavCompanyManagement details={dataa.projects} /> */}
         {/* <NavProjects projects={data.projects} /> */}
+        {
+          (currentMember?.role === "SUPER_ADMIN") &&
+          <NavAppManagement details={currentMember?.modules} />
+        }
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={currentMember} />

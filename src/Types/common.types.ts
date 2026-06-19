@@ -9,15 +9,12 @@ export type Address = {
 };
 
 
-export type ModuleName = COMPANY_MODULES | APP_MODULES;
 
 
 export interface ModuleAccess {
-  name: ModuleName;
-  canAccess?: boolean;
-  isActive?: boolean;
-  description?: string;
-  permissions: Permission[];
+    moduleId: any;
+    isActive?: boolean;
+    permissions: Permission[];
 }
 
 export interface Subscription {

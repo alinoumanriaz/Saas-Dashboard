@@ -1,10 +1,9 @@
-import { CompanyMember } from "@/Types/companyMember.types";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 
 interface CurrentCompanyState {
     loading: boolean;
-    companyMember: CompanyMember | null;
+    companyMember: any | null;
 }
 
 const initialState: CurrentCompanyState = {
@@ -16,7 +15,8 @@ const currentCompanyMemberSlice = createSlice({
     name: "currentCompanyMember",
     initialState,
     reducers: {
-        setCompanyMember: (state, action: PayloadAction<CompanyMember>) => {
+        setCompanyMember: (state, action: PayloadAction<any>) => {
+            console.log({inredux: action.payload})
             state.companyMember = action.payload;
             state.loading = false;
         },

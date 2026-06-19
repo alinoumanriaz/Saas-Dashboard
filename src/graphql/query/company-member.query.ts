@@ -126,10 +126,17 @@ query GetCompaniesOfCurrentMemberById($id: String!) {
       status
       websites
       modules {
-        name
-        canAccess
-        permissions
-      }
+          module {
+            id
+            moduleName
+            route
+            moduleIcon
+            description
+            status
+          }
+          isActive
+          permissions
+        }
       createdAt
       updatedAt
     }

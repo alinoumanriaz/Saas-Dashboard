@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client"
 
 import * as React from "react"
@@ -18,18 +19,26 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { setCompanyCurrentWebsite } from "@/redux/slicers/companyCurrentWebsite"
+import { useAppDispatch } from "@/redux/hooks"
 
 export function WebsiteSwitcher({
   websites,
 }: {
-  websites: {
-    name: string
-    logo: React.ReactNode
-    plan: string
-  }[]
+  websites: any[]
 }) {
+  const dispatch = useAppDispatch()
   const { isMobile } = useSidebar()
-  const [activeWebsite, setActiveWebsite] = React.useState(websites[0])
+  const [activeWebsite, setActiveWebsite] = React.useState<any>()
+
+  React.useEffect(() => {
+    if (websites?.length) {
+      setActiveWebsite(websites[0]);
+      dispatch(setCompanyCurrentWebsite(websites[0]));
+    } else {
+      setActiveWebsite(null);
+    }
+  }, [websites]);
 
   if (!activeWebsite) {
     return null
@@ -73,7 +82,7 @@ export function WebsiteSwitcher({
                   {website.logo}
                 </div>
                 {website.name}
-                <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
+                {/* <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut> */}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />

@@ -27,6 +27,8 @@ const LoadCurrentMember = ({ children }: LoadCurrentMemberProps) => {
     }
   }, [data, loading, dispatch]);
 
+  console.log({getCurrentMember:data})
+
   // While loading, show a full‑screen spinner
   if (loading) {
     return (

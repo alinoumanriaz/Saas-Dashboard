@@ -5,6 +5,7 @@ import { ToastContainer } from "react-toastify";
 import { Providers } from "@/redux/providers";
 import { cn } from "@/lib/utils";
 import { Geist } from "next/font/google";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -19,14 +20,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html lang="en" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
       <body className="antialiased overflow-x-hidden">
-        <Providers>
-          <ApolloWrapper>
-          <ToastContainer />
-            {children}
-          </ApolloWrapper>
-        </Providers>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Providers>
+            <ApolloWrapper>
+              <ToastContainer />
+              {children}
+            </ApolloWrapper>
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );

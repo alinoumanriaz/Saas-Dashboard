@@ -31,18 +31,6 @@ export const GET_PAGINATED_MEMBERS = gql`
           SubscriptionStatus
           paymentMethod
         }
-        modules {
-          moduleId {
-            id
-            moduleName
-            route
-            moduleIcon
-            description
-            status
-          }
-          isActive
-          permissions
-        }
         address {
           street
           city
@@ -119,7 +107,7 @@ export const GET_CURRENT_MEMBER = gql`
         role
         isVerified
         modules {
-          moduleId {
+          module {
             id
             moduleName
             route

@@ -1,14 +1,12 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client"
-
 import * as React from "react"
-
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -18,21 +16,31 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import { getInitials } from "@/helpers/getInitials"
+import { useAppDispatch } from "@/redux/hooks"
+import { setCompanyMember } from "@/redux/slicers/currentCompanyMember"
 
 
 export function CompanySwitcher({
-  companies,
+  companyMembers,
 }: {
-  companies: any[]
+  companyMembers: any[]
 }) {
-  console.log({allcompanies:companies})
+  const dispatch = useAppDispatch();
   const { isMobile } = useSidebar()
-  const [activeCompany, setActiveCompany] = React.useState<any>(companies[0])
-  console.log({activeCompany:activeCompany})
+  const [activeCompany, setActiveCompany] = React.useState<any>(companyMembers[0])
 
-  if (!activeCompany) {
-    return null
-  }
+  React.useEffect(() => {
+    if (companyMembers?.length) {
+      setActiveCompany(companyMembers[0]);
+      // dispatch(setCompanyMember(companyMembers[0]));
+    } else {
+      setActiveCompany(null);
+    }
+  }, [companyMembers]);
+
+  if (!activeCompany) return null
 
   return (
     <SidebarMenu>
@@ -44,11 +52,14 @@ export function CompanySwitcher({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                {activeCompany.logo}
+                <Avatar className="h-8 w-8 rounded-lg">
+                  <AvatarImage className="rounded-lg!" src={activeCompany.company.logo} alt={activeCompany.company.name} />
+                  <AvatarFallback className="ring-1 ring-gray-300">{getInitials(activeCompany.company.name)}</AvatarFallback>
+                </Avatar>
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{activeCompany.company.name}</span>
-                {/* <span className="truncate text-xs">{activeCompany.plan}</span> */}
+                <span className="truncate text-xs">{activeCompany.role}</span>
               </div>
               <ChevronsUpDownIcon className="ml-auto" />
             </SidebarMenuButton>
@@ -62,17 +73,28 @@ export function CompanySwitcher({
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Companies
             </DropdownMenuLabel>
-            {companies.map((company, index) => (
+            {companyMembers.map((companyMember, index) => (
               <DropdownMenuItem
-                key={company.name}
-                onClick={() => setActiveCompany(company)}
+                key={index}
+                onClick={() => {
+                  setActiveCompany(companyMember);
+                  console.log({companyMember:companyMember})
+                  dispatch(setCompanyMember(companyMember))
+                  }
+                }
                 className="gap-2 p-2"
               >
                 <div className="flex size-6 items-center justify-center rounded-md border">
-                  {company.logo}
+                  <Avatar className="h-8 w-8 rounded-lg">
+                    <AvatarImage src={companyMember.company.logo} alt={companyMember.company.name} />
+                    <AvatarFallback className="rounded-lg h-8 w-8">{getInitials(companyMember.company.name)}</AvatarFallback>
+                  </Avatar>
                 </div>
-                {company.name}
-                <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
+                <div>
+                  <div>{companyMember.company.name}</div>
+                  {/* <div>{companyMember.company.name}</div> */}
+                </div>
+                {/* <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut> */}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
