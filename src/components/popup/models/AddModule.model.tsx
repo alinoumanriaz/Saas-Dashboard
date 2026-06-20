@@ -44,6 +44,7 @@ import {
   Settings,
 } from "lucide-react";
 import { getLucideIcon } from "@/helpers/LucidIconFinder";
+import { BiUser } from "react-icons/bi";
 
 // Enums
 enum ModuleStatus {
@@ -213,14 +214,6 @@ const AddModules = ({
           </DialogHeader>
 
           <Tabs defaultValue="basic" value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="w-full justify-start gap-2 p-0 border-b rounded-none">
-              <TabsTrigger value="basic" className="data-[state=active]:border-b-2 data-[state=active]:border-b-primary shadow-none! w-60 data-[state=active]:text-primary rounded-none! px-4 py-2">
-                Basic Information
-              </TabsTrigger>
-              {/* <TabsTrigger value="advanced" className="data-[state=active]:border-b-2 data-[state=active]:border-b-primary shadow-none! w-60 data-[state=active]:text-primary rounded-none! px-4 py-2">
-                Advanced Settings
-              </TabsTrigger> */}
-            </TabsList>
 
             <ScrollArea className="flex-1 px-6 py-4 overflow-y-auto">
               {/* Basic Information Tab */}

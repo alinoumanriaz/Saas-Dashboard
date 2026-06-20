@@ -224,7 +224,7 @@ const Page = () => {
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-hidden">
               <TableBox
                 column={columns}
                 checkbox={true}
@@ -238,7 +238,7 @@ const Page = () => {
                 }
                 deletehandler={deleteHandler}
                 edithandler={editHandler}
-                height="max-h-[calc(100vh-380px)]"
+                height="max-h-[calc(100vh-180px)]"
                 status={false}
                 createdAt={false}
                 updatedAt={false}
@@ -253,7 +253,7 @@ const Page = () => {
                         </div>
 
                         <div>
-                          <div className="font-medium text-gray-900">
+                          <div className="font-medium text-primary">
                             {value}
                           </div>
                           <div className=" text-gray-400">

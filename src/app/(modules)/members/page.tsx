@@ -11,7 +11,7 @@ import {
   initialFilterState,
 } from "@/useReducerHooks/user-filter-reducer";
 import ConfirmationBox from "@/components/popup/models/ConfirmationBox";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import AddMember from "@/components/popup/models/AddMember.model";
 import { useAppSelector } from "@/redux/hooks";
 import { GET_PAGINATED_MEMBERS } from "@/graphql/query/member.query";
@@ -19,10 +19,9 @@ import { PlatformRole } from "@/enums/common.enums";
 import { Member } from "@/Types/member.types";
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Filter, FilterX, RefreshCw, ChevronDown, ChevronUp, ListFilter, Activity, XCircle, BadgeCheck, Users, TrendingUp, Sparkles, AlertTriangle, ArrowUpRight } from "lucide-react";
+import { FilterX, RefreshCw, ListFilter } from "lucide-react";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -65,7 +64,7 @@ const Page = () => {
       role === "ADMIN" ? PlatformRole.ADMIN :
         role === "OWNER" ? PlatformRole.OWNER : null;
 
-  const { data, loading, error, refetch } = useQuery<any>(GET_PAGINATED_MEMBERS, {
+  const { data, loading, error, refetch, networkStatus } = useQuery<any>(GET_PAGINATED_MEMBERS, {
     variables: {
       page: Number(currentPage) || 1,
       limit: Number(ITEMS_PER_PAGE) || 10,
@@ -75,6 +74,8 @@ const Page = () => {
     },
     fetchPolicy: "network-only",
   });
+
+  const showTableLoading = loading && networkStatus === 1;
 
   const [deleteMembers] = useMutation<any>(DELETE_MEMBERS);
 
@@ -105,7 +106,7 @@ const Page = () => {
     if (selectedIdsForDeleteion.length === 0) return;
 
     if (!isSuperAdmin) {
-      toast.error("Access denied");
+      toast.error("Access denied", { position: "top-center"});
       return;
     }
 
@@ -115,16 +116,16 @@ const Page = () => {
       });
 
       if (data?.deleteMembers?.success) {
-        toast.success(data.deleteMembers.message);
+        toast.success(data.deleteMembers.message, { position: "top-center"});
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeleteion([]);
       } else {
-        toast.error(data?.deleteMembers?.message || "Failed to delete members");
+        toast.error(data?.deleteMembers?.message || "Failed to delete members", { position: "top-center"});
         setIsDeleting(false);
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete members");
+      toast.error(err.message || "Failed to delete members", { position: "top-center"});
       setIsDeleting(false);
     } finally {
       setIsDeleting(false);
@@ -142,7 +143,7 @@ const Page = () => {
       currentMember?.role !== PlatformRole.SUPER_ADMIN &&
       currentMember?.role !== PlatformRole.OWNER
     ) {
-      toast.error("Only SUPER_ADMIN can edit members");
+      toast.error("Only SUPER_ADMIN can edit members", { position: "top-center"});
       return;
     }
 
@@ -153,7 +154,7 @@ const Page = () => {
       return;
     }
 
-    toast.error("Admins can only edit members from their own tenant");
+    toast.error("Admins can only edit members from their own tenant", { position: "top-center"});
   };
 
   const addHandler = () => {
@@ -201,7 +202,7 @@ const Page = () => {
 
               {/* Filter Toggle Button */}
               <Button
-                variant={showFilters ? "default" : "outline"}
+                variant={showFilters ? "outline" : "outline"}
                 onClick={() => setShowFilters(!showFilters)}
                 className="gap-2"
               >
@@ -393,7 +394,7 @@ const Page = () => {
                 column={columns}
                 checkbox={true}
                 action={true}
-                loading={loading}
+                loading={showTableLoading}
                 data={tableData}
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -405,7 +406,7 @@ const Page = () => {
                 isVerified={true}
                 deletehandler={deleteHandler}
                 edithandler={editHandler}
-                height="max-h-[calc(100vh-380px)]"
+                height="max-h-[calc(100vh-80px)]"
                 createdAt={false}
                 updatedAt={true}
                 customRenderers={{

@@ -6,6 +6,7 @@ import { Providers } from "@/redux/providers";
 import { cn } from "@/lib/utils";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -35,6 +36,7 @@ export default function RootLayout({
             </ApolloWrapper>
           </Providers>
         </ThemeProvider>
+        <Toaster />
       </body>
     </html>
   );

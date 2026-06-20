@@ -180,8 +180,7 @@ const TableBox = ({
       )}
 
       <div className="flex-1 overflow-hidden rounded-lg border border-border">
-        <div className={`overflow-auto ${height || "max-h-125"} scrollbar-thin`}>
-          <Table>
+          <Table className="w-full ">
             <TableHeader className="sticky top-0 z-20 bg-background backdrop-blur-sm">
               <TableRow className="hover:bg-transparent">
                 {checkbox && (
@@ -353,7 +352,7 @@ const TableBox = ({
                 sortedData.map((item, index) => (
                   <TableRow
                     key={`${index}-${item.id || index}`}
-                    className="hover:bg-muted/50 transition-colors"
+                    className=" transition-colors"
                   >
                     {checkbox && (
                       <TableCell className="sticky left-0 z-10 bg-background">
@@ -578,7 +577,6 @@ const TableBox = ({
               )}
             </TableBody>
           </Table>
-        </div>
       </div>
 
       {totalPages > 1 && (
