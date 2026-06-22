@@ -107,7 +107,7 @@ export const GET_CURRENT_MEMBER = gql`
         role
         isVerified
         modules {
-          module {
+          moduleId {
             id
             moduleName
             route

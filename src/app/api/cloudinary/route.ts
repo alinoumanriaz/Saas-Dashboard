@@ -45,8 +45,6 @@ export async function DELETE(req: Request) {
     const body = await req.json();
     const { public_ids, folder } = body;
 
-    console.log({ del: body });
-
     if (!Array.isArray(public_ids) || public_ids.length === 0) {
       return NextResponse.json(
         { error: "public_ids array is required" },

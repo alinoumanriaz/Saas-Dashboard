@@ -27,7 +27,11 @@ export const GET_PAGINATED_COMPANIES = gql`
           zip
           country
         }
-        ownerIds
+        ownerIds {
+         id
+         username
+         email
+        }
         createdAt
         updatedAt
       }

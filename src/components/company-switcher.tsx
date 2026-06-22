@@ -53,19 +53,19 @@ export function CompanySwitcher({
             >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage className="rounded-lg!" src={activeCompany.company.logo} alt={activeCompany.company.name} />
-                  <AvatarFallback className="ring-1 ring-gray-300">{getInitials(activeCompany.company.name)}</AvatarFallback>
+                  <AvatarImage className="rounded-lg!" src={activeCompany?.companyId?.logo} alt={activeCompany?.companyId?.name} />
+                  <AvatarFallback className="ring-1 ring-gray-300">{getInitials(activeCompany?.companyId?.name)}</AvatarFallback>
                 </Avatar>
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{activeCompany.company.name}</span>
-                <span className="truncate text-xs">{activeCompany.role}</span>
+                <span className="truncate font-medium">{activeCompany?.companyId?.name}</span>
+                <span className="truncate text-xs">{activeCompany?.role}</span>
               </div>
               <ChevronsUpDownIcon className="ml-auto" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-fit"
+            className="w-fit min-w-60"
             align="start"
             side={isMobile ? "bottom" : "right"}
             sideOffset={4}
@@ -86,13 +86,13 @@ export function CompanySwitcher({
               >
                 <div className="flex size-6 items-center justify-center rounded-md border">
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src={companyMember.company.logo} alt={companyMember.company.name} />
-                    <AvatarFallback className="rounded-lg h-8 w-8">{getInitials(companyMember.company.name)}</AvatarFallback>
+                    <AvatarImage src={companyMember?.companyId?.logo} alt={companyMember?.companyId?.name} />
+                    <AvatarFallback className="rounded-lg h-8 w-8">{getInitials(companyMember?.companyId?.name)}</AvatarFallback>
                   </Avatar>
                 </div>
                 <div>
-                  <div>{companyMember.company.name}</div>
-                  {/* <div>{companyMember.company.name}</div> */}
+                  <div>{companyMember?.companyId?.name}</div>
+                  <div className="text-xs">{companyMember?.role}</div>
                 </div>
                 {/* <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut> */}
               </DropdownMenuItem>

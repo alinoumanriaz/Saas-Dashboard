@@ -1,13 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
         hostname: "res.cloudinary.com",
-        pathname: "/dvu49dsgg/image/upload/**",
+        pathname: "/dj5dbawzz/image/upload/**",
       },
       {
         protocol: "https",
@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "via.placeholder.com",
+        pathname: "**",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
         pathname: "**",
       },
     ],

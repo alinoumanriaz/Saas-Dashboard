@@ -19,166 +19,6 @@ import { GET_COMPANIES_OF_CURRENT_MEMBER_BY_ID } from "@/graphql/query/company-m
 import { Skeleton } from "./ui/skeleton"
 import { NavAppManagement } from "./nav-app-management"
 
-// This is sample data.
-const dataa = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  companies: [
-    {
-      name: "Acme Inc",
-      logo: (
-        <GalleryVerticalEndIcon
-        />
-      ),
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: (
-        <AudioLinesIcon
-        />
-      ),
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: (
-        <TerminalIcon
-        />
-      ),
-      plan: "Free",
-    },
-  ],
-  navMain: [
-    {
-      title: "Playground",
-      url: "#",
-      icon: (
-        <TerminalSquareIcon
-        />
-      ),
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: (
-        <BotIcon
-        />
-      ),
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: (
-        <BookOpenIcon
-        />
-      ),
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: (
-        <Settings2Icon
-        />
-      ),
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: (
-        <FrameIcon
-        />
-      ),
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: (
-        <PieChartIcon
-        />
-      ),
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: (
-        <MapIcon
-        />
-      ),
-    },
-  ],
-}
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const currentMember = useAppSelector((state) => state.currentMember.member);
   const { data, loading, error } = useQuery<any>(
@@ -187,54 +27,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       variables: {
         id: currentMember?.id,
       },
-      skip: !currentMember || currentMember?.role === "SUPER_ADMIN",
+      skip: !currentMember,
       fetchPolicy: "network-only", // Add this to ensure fresh data
     }
   );
   const currentCompaniesOfLogedInMember = data?.getCompaniesOfCurrentMemberById?.companyMembers || [];
-  console.log({ currentCompaniesOfLogedInMember: data })
+  console.log({ currentCompaniesOfLogedInMember: currentCompaniesOfLogedInMember })
   console.log({ currentCompaniesOfLogedInMember: error })
   console.log({ sidebarCurrentMember: currentMember?.modules })
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="mt-2">
-        {
-          (currentMember?.role === "SUPER_ADMIN") ?
-            <div
-              className="flex px-0 py-2 gap-x-3 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={currentMember.avatar || "/avatars/shadcn.jpg"} alt={currentMember.username} />
-                <AvatarFallback>SA</AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{currentMember?.username}</span>
-                <span className="truncate text-xs">{currentMember?.role}</span>
-              </div>
+        {loading ? (
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-37.5" />
+              <Skeleton className="h-4 w-37.5" />
             </div>
-            :
-            loading ? (
-              <div className="flex items-center gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-37.5" />
-                  <Skeleton className="h-4 w-37.5" />
-                </div>
-              </div>
-            )
-              :
-              <CompanySwitcher companyMembers={currentCompaniesOfLogedInMember} />
+          </div>
+        )
+          :
+          <CompanySwitcher companyMembers={currentCompaniesOfLogedInMember} />
         }
       </SidebarHeader>
       <SidebarContent>
         {/* <NavMain items={data.navMain} /> */}
-        {/* <NavWebsite items={dataa.navMain} />
-        <NavCompanyManagement details={dataa.projects} /> */}
-        {/* <NavProjects projects={data.projects} /> */}
+        {/* <NavWebsite items={dataa.navMain} /> */}
+        {/* <NavCompanyManagement details={dataa.projects} /> */}
         {
           (currentMember?.role === "SUPER_ADMIN") &&
-          <NavAppManagement details={currentMember?.modules} />
+          <NavAppManagement details={currentMember?.modules || []} />
         }
       </SidebarContent>
       <SidebarFooter>

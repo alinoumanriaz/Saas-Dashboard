@@ -1,7 +1,6 @@
-// src/app/admin/all-companies/page.tsx
 "use client";
 import { useEffect, useReducer, useState } from "react";
-import { BiSearch, BiBuilding, BiCheckCircle, BiXCircle } from "react-icons/bi";
+import { BiSearch, BiCheckCircle, BiXCircle } from "react-icons/bi";
 import TableBox from "@/components/tablebox/TableBox";
 import Container from "@/components/Container";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -11,13 +10,26 @@ import {
   initialFilterState,
 } from "@/useReducerHooks/company-filter-reducer";
 import ConfirmationBox from "@/components/popup/models/ConfirmationBox";
-import { toast } from "react-toastify";
 import AddCompany from "@/components/popup/models/AddCompany.model";
 import { useAppSelector } from "@/redux/hooks";
-import { BsArrowClockwise } from "react-icons/bs";
 import { CompanyMemberRole, PlatformRole } from "@/enums/common.enums";
 import { Company } from "@/Types/company.types";
-import Image from "next/image";
+
+// shadcn/ui components
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { FilterX, RefreshCw, ListFilter } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "@/helpers/getInitials";
+import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -32,11 +44,10 @@ const AllCompaniesPage = () => {
   const [showConfirmationModel, setShowConfirmationModel] = useState(false);
   const [showAddModel, setShowAddModel] = useState(false);
   const [selectedIdsForDeletion, setSelectedIdsForDeletion] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   const isSuperAdmin = currentMember?.role === PlatformRole.SUPER_ADMIN;
   const isOwner = currentCompanyMember?.role === CompanyMemberRole.OWNER;
-  console.log({ isOwner: isOwner })
-  console.log({ isSuperAdmin: isSuperAdmin })
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -45,7 +56,10 @@ const AllCompaniesPage = () => {
     return () => clearTimeout(timer);
   }, [searchText]);
 
-  const { data, loading, error, refetch } = useQuery<any>(GET_PAGINATED_COMPANIES, {
+  // Query – skip only if not super admin and no current company member
+  const shouldSkip = !isSuperAdmin && !currentCompanyMember;
+
+  const { data, loading, error, refetch, networkStatus } = useQuery<any>(GET_PAGINATED_COMPANIES, {
     variables: {
       page: Number(currentPage) || 1,
       limit: Number(ITEMS_PER_PAGE) || 10,
@@ -53,32 +67,34 @@ const AllCompaniesPage = () => {
       search: debouncedSearch || null,
     },
     fetchPolicy: "network-only",
-    skip: !currentCompanyMember, // Skip if no current member
+    skip: shouldSkip,
   });
 
+
   const [deleteCompanies] = useMutation<any>(DELETE_COMPANIES);
+
+  const showTableLoading = loading && networkStatus === 1;
 
   const allCompanies: Company[] = data?.getPaginatedCompanies?.companies || [];
   const totalCompanies = data?.getPaginatedCompanies?.totalCompaniesCount || 0;
   const totalPages = Math.ceil(totalCompanies / ITEMS_PER_PAGE);
 
+  console.log({ companies: allCompanies })
   // Filter companies based on user role and tenant access
   const filteredCompanies = allCompanies.filter(company => {
-    // Super admin sees all companies
     if (isSuperAdmin) return true;
-
-    // Owner see only companies they own
     if (currentCompanyMember) {
+      // Owner sees companies where they are in ownerIds
       return company.ownerIds?.includes(currentMember?.id || "");
     }
-
     return false;
   });
 
-  console.log({ filteredCompanies: filteredCompanies })
+  const tableData = filteredCompanies.map(company => ({
+    ...company,
+  }));
 
-
-  const columns = ["company", "status", "number"];
+  const columns = ["company", "owners", "status", "number"];
 
   const cancelDelete = () => {
     setSelectedIdsForDeletion([]);
@@ -88,22 +104,9 @@ const AllCompaniesPage = () => {
   const confirmDelete = async () => {
     if (selectedIdsForDeletion.length === 0) return;
 
-    // Security check for non-superadmins
     if (!isSuperAdmin) {
-      const companiesToDelete = filteredCompanies.filter(company =>
-        selectedIdsForDeletion.includes(company?.id || "")
-      );
-
-      console.log({ companiesToDelete: companiesToDelete })
-
-      const hasUnauthorizedDelete = companiesToDelete.some(company =>
-        !company.ownerIds?.includes(currentCompanyMember?.member?.id || "")
-      );
-
-      if (hasUnauthorizedDelete) {
-        toast.error("You can only delete companies you own");
-        return;
-      }
+      toast.error("Access denied", { position: "top-center" });
+      return;
     }
 
     try {
@@ -112,15 +115,15 @@ const AllCompaniesPage = () => {
       });
 
       if (data?.deleteCompanies?.success) {
-        toast.success(data.deleteCompanies.message);
+        toast.success(data.deleteCompanies.message, { position: "top-center" });
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
       } else {
-        toast.error(data?.deleteCompanies?.message || "Failed to delete companies");
+        toast.error(data?.deleteCompanies?.message || "Failed to delete companies", { position: "top-center" });
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete companies");
+      toast.error(err.message || "Failed to delete companies", { position: "top-center" });
     }
   };
 
@@ -130,30 +133,24 @@ const AllCompaniesPage = () => {
   };
 
   const editHandler = (companyData: Company) => {
-    // Check if user has permission to edit
     if (!isSuperAdmin && !isOwner) {
-      toast.error("Only super admins, owners, and admins can edit companies");
+      toast.error("Only super admins, owners, and admins can edit companies", { position: "top-center" });
       return;
     }
-
-    // Check if user owns this company (for non-super admins)
     if (!isSuperAdmin && !companyData.ownerIds?.includes(currentCompanyMember?.id || "")) {
-      toast.error("You can only edit companies you own");
+      toast.error("You can only edit companies you own", { position: "top-center" });
       return;
     }
-
     setIsEditMode(true);
     setSelectedData(companyData);
     setShowAddModel(true);
   };
 
   const addHandler = () => {
-    // Check if user has permission to add
     if (!isSuperAdmin && !isOwner) {
-      toast.error("Only super admins, owners, and admins can add companies");
+      toast.error("Only super admins, owners, and admins can add companies", { position: "top-center" });
       return;
     }
-
     setSelectedData(null);
     setIsEditMode(false);
     setShowAddModel(true);
@@ -168,7 +165,7 @@ const AllCompaniesPage = () => {
   // Custom renderer for status column
   const statusRenderer = (_: string, value: boolean) => (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${value
-      ? 'bg-green-100 text-green-800'
+      ? 'bg-green-200/10 text-green-600'
       : 'bg-red-100 text-red-800'
       }`}>
       {value ? (
@@ -185,39 +182,50 @@ const AllCompaniesPage = () => {
     </span>
   );
 
-  // Custom renderer for company name with logo
+  // Custom renderer for company name with logo (using shadcn Avatar)
   const companyRenderer = (_: string, value: any) => (
-    <div className="flex items-center space-x-3">
-      {/* Avatar */}
-      <div className="shrink-0">
-        {value ? (
-          <Image
-            src={value?.logo || '/userAvater.jpg'}
-            alt={value?.name || "Company"}
-            width={40}
-            height={40}
-            className="rounded-full object-cover w-10 h-10 ring-2 ring-gray-200"
-          />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center ring-2 ring-gray-200">
-            <span className="text-gray-500 text-sm font-medium">
-              {value?.name?.charAt(0)?.toUpperCase() || "C"}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Email and Username */}
+    <div className="flex items-center gap-3">
+      <Avatar className="h-8 w-8 rounded-lg">
+        <AvatarImage src={value.logo} alt={value.name} />
+        <AvatarFallback >{getInitials(value.name)}</AvatarFallback>
+      </Avatar>
       <div>
-        <div className="font-medium text-gray-900">
+        <div className="font-medium text-foreground">
           {value?.name || "Unknown"}
         </div>
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-gray-500">
           {value?.email || "No email"}
         </div>
       </div>
     </div>
   );
+
+  const ownersRender = (_: string, value: any) => {
+    if (!value.ownerIds || (value.ownerIds).length === 0) {
+      return <span className="text-muted-foreground text-sm">No owners</span>;
+    }
+
+    return (
+      <div className="flex gap-1">
+        {value.ownerIds.map((owner: any) => (
+          <div key={owner.id} className="flex flex-col items-start">
+            <div className="font-medium text-foreground">
+              {owner.username || owner.email || "Unknown"}
+            </div>
+            {owner.email && (
+              <div className="text-xs text-muted-foreground">{owner.email}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Count active filters
+  const activeFiltersCount = [
+    isActive !== undefined,
+    searchText
+  ].filter(Boolean).length;
 
   if (error) {
     return (
@@ -250,154 +258,175 @@ const AllCompaniesPage = () => {
       <div className="w-full h-full text-[13px]">
         <div className="w-full h-full overflow-hidden px-4">
           {/* Header Section */}
-          <div className="flex justify-between items-center py-6">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-bold text-gray-900">Company Management</h1>
-              <p className="text-gray-600 flex items-center">
-                <span>Total Companies: {totalCompanies}</span>
+          <div className="flex justify-between items-center pb-4">
+            <CardHeader className="w-full p-0">
+              <CardTitle className="text-xl">Companies Management</CardTitle>
+              <CardDescription>
+                Total Companies: {totalCompanies}
                 {!isSuperAdmin && (
-                  <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs">
-                    Showing {filteredCompanies.length} of {totalCompanies} (Your Companies)
+                  <span className="ml-2 text-sm text-blue-600">
+                    (Showing {filteredCompanies.length} of {totalCompanies} – Your Companies)
                   </span>
                 )}
-              </p>
-            </div>
+              </CardDescription>
+            </CardHeader>
 
             <div className="flex items-center space-x-3">
-              <button
+              {/* Filter Toggle Button */}
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
+              >
+                <ListFilter className="size-4" />
+                {activeFiltersCount > 0 && (
+                  <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-5">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
                 onClick={() => refetch()}
                 disabled={loading}
-                className="px-4 py-2 cursor-pointer rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="gap-1"
               >
-                <BsArrowClockwise className={`${loading ? "animate-spin" : ""} size-4`} />
-                <span>Refresh</span>
-              </button>
+                {loading ? (
+                  <>
+                    <RefreshCw className="size-4 animate-spin" />
+                    <span>Refreshing...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="size-4" />
+                    <span>Refresh</span>
+                  </>
+                )}
+              </Button>
+
               {(isSuperAdmin || isOwner) && (
-                <button
-                  onClick={addHandler}
-                  className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                >
+                <Button onClick={addHandler}>
                   Add Company
-                </button>
+                </Button>
               )}
             </div>
           </div>
 
-          {/* Filter Section - Only show for Super Admin */}
-          {isSuperAdmin && (
-            <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Status Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    onChange={(e) =>
-                      dispatch({
-                        type: "SET_ACTIVE",
-                        payload: e.target.value === "" ? undefined : e.target.value === "true",
-                      })
-                    }
-                    value={isActive === undefined ? "" : String(isActive)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  >
-                    <option value="">All Status</option>
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
-                  </select>
-                </div>
+          {/* Filter Section - Toggle visibility */}
+          {showFilters && (
+            <Card className="animate-in bg-background slide-in-from-top-2 duration-200 ring-0">
+              <div className="w-full">
+                <div className="w-full flex justify-start items-center gap-2 flex-wrap">
+                  {/* Search Input */}
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Input
+                        id="search"
+                        onChange={(e) =>
+                          dispatch({ type: "SET_SEARCH", payload: e.target.value })
+                        }
+                        className="pl-10 w-64"
+                        placeholder="Search companies..."
+                        type="text"
+                        value={searchText}
+                      />
+                      <BiSearch className="absolute left-2 top-1/2 size-5 transform -translate-y-1/2" />
+                    </div>
+                  </div>
 
-                {/* Search Input */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Search
-                  </label>
-                  <div className="relative">
-                    <input
-                      onChange={(e) =>
-                        dispatch({ type: "SET_SEARCH", payload: e.target.value })
+                  {/* Status Filter */}
+                  <div className="space-y-2 w-40">
+                    <Select
+                      onValueChange={(value) =>
+                        dispatch({
+                          type: "SET_ACTIVE",
+                          payload: value === "all" ? undefined : value === "true",
+                        })
                       }
-                      className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="Search by company name or email..."
-                      type="text"
-                      value={searchText}
-                    />
-                    <BiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      value={isActive === undefined ? "all" : String(isActive)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="true">Active</SelectItem>
+                        <SelectItem value="false">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-
-                {/* Reset Button */}
-                <div className="flex items-end">
-                  <button
-                    onClick={() => dispatch({ type: "RESET_FILTERS" })}
-                    className="w-full px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                  >
-                    Reset Filters
-                  </button>
-                </div>
               </div>
+            </Card>
+          )}
+
+          {/* Active Filters Display */}
+          {activeFiltersCount > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2 items-center px-3">
+              <span className="text-sm text-gray-600 font-medium">Active Filters:</span>
+              {isActive !== undefined && (
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-100 text-green-800">
+                  {isActive ? "Active" : "Inactive"}
+                  <button
+                    onClick={() => dispatch({ type: "SET_ACTIVE", payload: undefined })}
+                    className="ml-2 hover:text-green-600 font-bold"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {searchText && (
+                <span className="inline-flex items-center px-2 rounded-md text-xs text-purple-800">
+                  Search: {searchText}
+                  <button
+                    onClick={() => dispatch({ type: "SET_SEARCH", payload: "" })}
+                    className="ml-2 hover:text-purple-600 font-bold"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {showFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    dispatch({ type: "RESET_FILTERS" });
+                  }}
+                  className="text-red-600 ml-auto hover:text-red-700"
+                >
+                  <FilterX className="size-4 mr-1" />
+                  Reset All Filters
+                </Button>
+              )}
             </div>
           )}
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center">
-                <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                  <BiBuilding className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">
-                    {isSuperAdmin ? 'Total Companies' : 'Your Companies'}
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {isSuperAdmin ? totalCompanies : filteredCompanies.length}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center">
-                <div className="p-2 bg-green-100 rounded-lg mr-3">
-                  <BiCheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Active Companies</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {(isSuperAdmin ? allCompanies : filteredCompanies).filter(c => c.isActive).length}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Main Table */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <TableBox
-              column={columns}
-              checkbox={isSuperAdmin} // Only super admin can bulk delete
-              action={true}
-              loading={loading}
-              data={filteredCompanies}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              setCurrentPage={(page) =>
-                dispatch({ type: "SET_PAGE", payload: page })
-              }
-              status={false}
-              deletehandler={isSuperAdmin || isOwner ? deleteHandler : undefined} // Only super admin can delete
-              edithandler={editHandler}
-              height="max-h-[calc(100vh-380px)]"
-              createdAt={true}
-              updatedAt={true}
-              customRenderers={{
-                status: statusRenderer,
-                company: companyRenderer,
-              }}
-            />
-          </div>
+          <TableBox
+            column={columns}
+            checkbox={isSuperAdmin} // Only super admin can bulk delete
+            action={true}
+            loading={showTableLoading}
+            data={tableData}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            setCurrentPage={(page) =>
+              dispatch({ type: "SET_PAGE", payload: page })
+            }
+            status={false}
+            deletehandler={isSuperAdmin ? deleteHandler : undefined} // Only super admin can delete
+            edithandler={editHandler}
+            height="max-h-[calc(100vh-380px)]"
+            createdAt={true}
+            updatedAt={true}
+            customRenderers={{
+              status: statusRenderer,
+              company: companyRenderer,
+              owners: ownersRender,
+            }}
+          />
         </div>
       </div>
 

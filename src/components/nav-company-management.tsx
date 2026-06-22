@@ -16,7 +16,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { getLucideIcon } from "@/helpers/LucidIconFinder"
 import { MoreHorizontalIcon, FolderIcon, ArrowRightIcon, Trash2Icon } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 export function NavCompanyManagement({
   details,
@@ -27,56 +30,25 @@ export function NavCompanyManagement({
     icon: React.ReactNode
   }[]
 }) {
-  const { isMobile } = useSidebar()
+   const pathname = usePathname()
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Company Management</SidebarGroupLabel>
       <SidebarMenu>
-        {details.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <a href={item.url}>
-                {item.icon}
-                <span>{item.name}</span>
-              </a>
+        {details.map((item: any, index: number) => {
+          const Icon = getLucideIcon(item.module.moduleIcon)
+          const isActive = pathname === item.module.route
+          return (
+          <SidebarMenuItem key={index}>
+            <SidebarMenuButton asChild isActive={isActive}>
+              <Link href={item.module.route}>
+                <Icon />
+                <span>{item.module.moduleName}</span>
+              </Link>
             </SidebarMenuButton>
-            {/* <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction
-                  showOnHover
-                  className="aria-expanded:bg-muted"
-                >
-                  <MoreHorizontalIcon
-                  />
-                  <span className="sr-only">More</span>
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-fit"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
-                <DropdownMenuItem>
-                  <FolderIcon
-                  />
-                  <span>View Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <ArrowRightIcon
-                  />
-                  <span>Share Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  <Trash2Icon
-                  />
-                  <span>Delete Project</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu> */}
           </SidebarMenuItem>
-        ))}
+        )})}
       </SidebarMenu>
     </SidebarGroup>
   )

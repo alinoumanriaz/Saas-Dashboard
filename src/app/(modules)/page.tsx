@@ -2,8 +2,8 @@ import React from 'react'
 
 const page = () => {
   return (
-    <div>
-      homo
+    <div className='flex justify-center items-center w-full h-[calc(100dvh-200px)]'>
+      <div>Soon</div> 
     </div>
   )
 }

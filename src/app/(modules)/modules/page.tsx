@@ -9,7 +9,6 @@ import {
   initialFilterState,
 } from "@/useReducerHooks/module-filter-reducer";
 import ConfirmationBox from "@/components/popup/models/ConfirmationBox";
-import { toast } from "react-toastify";
 import AddModule from "@/components/popup/models/AddModule.model";
 import { useAppSelector } from "@/redux/hooks";
 import { PlatformRole } from "@/enums/common.enums";
@@ -23,6 +22,7 @@ import {
 import { getLucideIcon } from "@/helpers/LucidIconFinder";
 import { Field } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -44,7 +44,7 @@ const Page = () => {
   const [deleteCustomModules] = useMutation<any>(DELETE_CUSTOM_MODULES);
   const [updateAllMemberCustomModules] = useMutation<any>(UPDATE_ALL_MEMBER_CUSTOM_MODULES);
 
-  const { data, loading, error, refetch } = useQuery<any>(GET_PAGINATED_CUSTOM_MODULES, {
+  const { data, loading, error, refetch, networkStatus } = useQuery<any>(GET_PAGINATED_CUSTOM_MODULES, {
     variables: {
       page: 1,
       limit: Number(ITEMS_PER_PAGE) || 10,
@@ -53,6 +53,7 @@ const Page = () => {
   });
 
   console.log({ dataa: data })
+  const showTableLoading = loading && networkStatus === 1;
 
   const allModules: Module[] = data?.getPaginatedCustomModules?.customModules || [];
   const totalModules = data?.getPaginatedCustomModules?.totalCustomModulesCount || 0;
@@ -63,7 +64,7 @@ const Page = () => {
     ...module,
   }));
 
-  const columns = ["moduleName", "superAdmin", "owner", "admin"];
+  const columns = ["moduleName", "moduleType", "superAdmin", "owner", "admin"];
 
   const cancelDelete = () => {
     setSelectedIdsForDeletion([]);
@@ -75,7 +76,7 @@ const Page = () => {
     if (selectedIdsForDeletion.length === 0) return;
 
     if (!isSuperAdmin && !isAdmin) {
-      toast.error("Access denied");
+      toast.error("Access denied", {position: "top-center"});
       return;
     }
 
@@ -87,15 +88,15 @@ const Page = () => {
       console.log({deleteerror:error})
 
       if (data?.deleteCustomModules?.success) {
-        toast.success(data.deleteCustomModules.message);
+        toast.success(data.deleteCustomModules.message, {position: "top-center"});
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
       } else {
-        toast.error(data?.deleteCustomModules?.message || "Failed to delete modules");
+        toast.error(data?.deleteCustomModules?.message || "Failed to delete modules", {position: "top-center"});
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete modules");
+      toast.error(err.message || "Failed to delete modules", {position: "top-center"});
     } finally {
       setIsDeleting(false);
     }
@@ -108,7 +109,7 @@ const Page = () => {
 
   const editHandler = (eventData: any) => {
     if (!isSuperAdmin && !isAdmin) {
-      toast.error("You don't have permission to edit events");
+      toast.error("You don't have permission to edit events", {position: "top-center"});
       return;
     }
     setIsEditMode(true);
@@ -149,7 +150,7 @@ const Page = () => {
       },
     });
 
-    // toast.success(`${field} updated successfully`);
+    // toast.success(`${field} updated successfully`, {position: "top-center"});
     // refetch();
   } catch (err: any) {
     setToggleOverrides((prev) => ({
@@ -157,7 +158,7 @@ const Page = () => {
       [key]: !newValue,
     }));
 
-    toast.error(err.message || "Failed to update module");
+    toast.error(err.message || "Failed to update module", {position: "top-center"});
   } finally {
     setLoadingSwitches((prev) => ({ ...prev, [key]: false }));
   }
@@ -229,7 +230,7 @@ const Page = () => {
                 column={columns}
                 checkbox={true}
                 action={true}
-                loading={loading}
+                loading={showTableLoading}
                 data={tableData}
                 currentPage={1}
                 totalPages={totalPages}

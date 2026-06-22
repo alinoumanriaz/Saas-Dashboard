@@ -19,24 +19,19 @@ export const GET_PAGINATED_COMPANY_MEMBERS = gql`
     ) {
       companyMembers {
         id
-        member {
+        memberId {
           id
           email
           username
           phone
           avatar
         }
-        company {
+        companyId {
           id
           name
         }
         role
         status
-        modules {
-          name
-          canAccess
-          permissions
-        }
         websites
         createdAt
         updatedAt
@@ -77,7 +72,7 @@ export const GET_COMPANY_MEMBERS = gql`
 query {
     getCompanyMember{
         id
-        member {
+        memberId {
           id
           email
           firstName
@@ -86,17 +81,12 @@ query {
           phone
           avatar
         }
-        company {
+        companyId {
           id
           name
         }
         role
         status
-        modules {
-          name
-          canAccess
-          permissions
-        }
         websites {
           id
           name
@@ -113,26 +103,22 @@ query GetCompaniesOfCurrentMemberById($id: String!) {
   getCompaniesOfCurrentMemberById(id: $id) {
     companyMembers {
       id
-      member {
+      memberId {
       id
       username
       email
       }
-      company {
+      companyId {
       id
       name
+      logo
       }
       role
       status
       websites
       modules {
-          module {
-            id
-            moduleName
-            route
-            moduleIcon
-            description
-            status
+          moduleId {
+          route
           }
           isActive
           permissions
