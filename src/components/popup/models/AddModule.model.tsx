@@ -185,27 +185,27 @@ const AddModules = ({
           },
         });
         if (result.data?.updateCustomModule?.success) {
-          toast.success(result.data.updateCustomModule.message || "Module updated successfully",{position: "top-center"});
+          toast.success(result.data.updateCustomModule.message || "Module updated successfully", { position: "top-center" });
           refetch?.();
           onCancel();
         } else {
-          toast.error(result.data?.updateCustomModule?.message || "Failed to update module",{position: "top-center"});
+          toast.error(result.data?.updateCustomModule?.message || "Failed to update module", { position: "top-center" });
         }
       } else {
         const result = await createCustomModule({
           variables: { input: inputData },
         });
         if (result.data?.createCustomModule?.success) {
-          toast.success(result.data.createCustomModule.message || "Module created successfully",{position: "top-center"});
+          toast.success(result.data.createCustomModule.message || "Module created successfully", { position: "top-center" });
           refetch?.();
           onCancel();
         } else {
-          toast.error(result.data?.createCustomModule?.message || "Failed to create module",{position: "top-center"});
+          toast.error(result.data?.createCustomModule?.message || "Failed to create module", { position: "top-center" });
         }
       }
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Operation failed",{position: "top-center"});
+      toast.error(error.message || "Operation failed", { position: "top-center" });
     }
   };
 
