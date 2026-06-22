@@ -24,11 +24,7 @@ import { usePathname } from "next/navigation"
 export function NavCompanyManagement({
   details,
 }: {
-  details: {
-    name: string
-    url: string
-    icon: React.ReactNode
-  }[]
+  details: any[]
 }) {
    const pathname = usePathname()
 
@@ -37,14 +33,14 @@ export function NavCompanyManagement({
       <SidebarGroupLabel>Company Management</SidebarGroupLabel>
       <SidebarMenu>
         {details.map((item: any, index: number) => {
-          const Icon = getLucideIcon(item.module.moduleIcon)
-          const isActive = pathname === item.module.route
+          const Icon = getLucideIcon(item.moduleId.moduleIcon)
+          const isActive = pathname === item.moduleId.route
           return (
           <SidebarMenuItem key={index}>
             <SidebarMenuButton asChild isActive={isActive}>
-              <Link href={item.module.route}>
+              <Link href={item.moduleId.route}>
                 <Icon />
-                <span>{item.module.moduleName}</span>
+                <span>{item.moduleId.moduleName}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -17,7 +17,6 @@ const initialState: CurrentMemberState = {
   loading: true, // true initially because you're fetching on mount
   member: null,
   // token: typeof window !== "undefined" ? localStorage.getItem("token") : null,
-
 };
 
 const currentMemberSlice = createSlice({

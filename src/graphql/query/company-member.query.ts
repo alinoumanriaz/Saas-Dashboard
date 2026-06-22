@@ -118,7 +118,18 @@ query GetCompaniesOfCurrentMemberById($id: String!) {
       websites
       modules {
           moduleId {
+          id
+          moduleName
+          moduleIcon
+          description
           route
+          status
+          moduleType
+          parentModule{
+          id
+          moduleName
+          }
+          order
           }
           isActive
           permissions

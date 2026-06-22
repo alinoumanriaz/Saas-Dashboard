@@ -31,15 +31,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   CREATE_CUSTOM_MODULE,
   GET_ALL_CUSTOM_MODULES,
   UPDATE_CUSTOM_MODULE,
 } from "../../../graphql/query/module.query";
-import { LoaderCircle, Settings, Shield, Crown, Star, Lock } from "lucide-react";
+import { LoaderCircle, Settings, Shield, Crown, Star, Lock, X } from "lucide-react";
 import { toast } from "sonner";
 
-// Enums
+// ===================== Enums =====================
 enum ModuleStatus {
   ACTIVE = "ACTIVE",
   INACTIVE = "INACTIVE",
@@ -56,15 +57,74 @@ interface AddModulesProps {
   isSuperAdmin?: boolean;
 }
 
+// ===================== Tag Input Component =====================
+interface TagInputProps {
+  value: string[];
+  onChange: (tags: string[]) => void;
+  placeholder?: string;
+}
+
+const TagInput = ({ value, onChange, placeholder = "Type and press Enter" }: TagInputProps) => {
+  const [inputValue, setInputValue] = useState("");
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      const trimmed = inputValue.trim();
+      if (trimmed && !value.includes(trimmed)) {
+        onChange([...value, trimmed]);
+        setInputValue("");
+      }
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    onChange(value.filter((t) => t !== tag));
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2 border rounded-md p-2 focus-within:ring-2 focus-within:ring-ring">
+      {value.map((tag) => (
+        <Badge key={tag} variant="secondary" className="gap-1">
+          {tag}
+          <button
+            type="button"
+            onClick={() => removeTag(tag)}
+            className="hover:text-destructive"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ))}
+      <Input
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={() => {
+          if (inputValue.trim()) {
+            const trimmed = inputValue.trim();
+            if (!value.includes(trimmed)) {
+              onChange([...value, trimmed]);
+            }
+            setInputValue("");
+          }
+        }}
+        className="flex-1 min-w-[120px] border-0 p-0 shadow-none focus-visible:ring-0"
+        placeholder={value.length === 0 ? placeholder : ""}
+      />
+    </div>
+  );
+};
+
 // ===================== Zod Schema =====================
 const moduleSchema = z.object({
   moduleName: z.string().min(1, "Module name is required"),
   route: z.string().min(1, "Route is required"),
   description: z.string().optional(),
   moduleIcon: z.string().optional(),
-  moduleType: z.string().min(1, "Module type is required"),
+  moduleType: z.array(z.string()).min(1, "At least one module type is required"),
   status: z.nativeEnum(ModuleStatus).default(ModuleStatus.ACTIVE),
-  parentModule: z.string().optional(), // will be "none" or a real ID
+  parentModule: z.string().optional(), // "none" or a real ID
   order: z.coerce.number().min(0, "Order must be a positive number").default(0),
   isDefaultForOwner: z.boolean().default(false),
   isDefaultForAdmin: z.boolean().default(false),
@@ -79,7 +139,7 @@ const FieldErrorDisplay = ({ error }: { error?: any }) => {
   return <p className="text-sm text-destructive mt-1">{error.message}</p>;
 };
 
-// ===================== Component =====================
+// ===================== Main Component =====================
 const AddModules = ({
   onCancel,
   selectedData,
@@ -89,6 +149,8 @@ const AddModules = ({
 }: AddModulesProps) => {
   const [activeTab, setActiveTab] = useState<"basic" | "advanced">("basic");
   const [showRouteHelper, setShowRouteHelper] = useState(false);
+
+  console.log({ selectedMMMMMMModule: selectedData });
 
   const {
     control,
@@ -104,9 +166,9 @@ const AddModules = ({
       route: "",
       description: "",
       moduleIcon: "Settings",
-      moduleType: "",
+      moduleType: [],
       status: ModuleStatus.ACTIVE,
-      parentModule: "none", // use "none" as the "no parent" value
+      parentModule: "none",
       order: 0,
       isDefaultForOwner: false,
       isDefaultForAdmin: false,
@@ -128,14 +190,24 @@ const AddModules = ({
   // Populate edit data
   useEffect(() => {
     if (isEditMode && selectedData) {
+      // Ensure moduleType is an array
+      let moduleTypeArray: string[] = [];
+      if (selectedData.moduleType) {
+        if (Array.isArray(selectedData.moduleType)) {
+          moduleTypeArray = selectedData.moduleType;
+        } else if (typeof selectedData.moduleType === "string") {
+          moduleTypeArray = [selectedData.moduleType];
+        }
+      }
+
       reset({
         moduleName: selectedData.moduleName || "",
         route: selectedData.route || "",
         description: selectedData.description || "",
         moduleIcon: selectedData.moduleIcon || "Settings",
-        moduleType: selectedData.moduleType || "",
+        moduleType: moduleTypeArray,
         status: selectedData.status || ModuleStatus.ACTIVE,
-        parentModule: selectedData.parentModule || "none",
+        parentModule: selectedData?.parentModule?.id || "none",
         order: selectedData.order || 0,
         isDefaultForOwner: selectedData.isDefaultForOwner || false,
         isDefaultForAdmin: selectedData.isDefaultForAdmin || false,
@@ -147,7 +219,6 @@ const AddModules = ({
   // GraphQL queries & mutations
   const { data } = useQuery<any>(GET_ALL_CUSTOM_MODULES, {
     fetchPolicy: "network-only",
-    // nextFetchPolicy: "cache-first",
   });
   const modules = data?.getAllCustomModules || [];
 
@@ -167,7 +238,7 @@ const AddModules = ({
       route: data.route,
       description: data.description,
       moduleIcon: data.moduleIcon,
-      moduleType: data.moduleType,
+      moduleType: data.moduleType, // now an array
       status: data.status,
       parentModule: parentModuleId,
       order: data.order,
@@ -185,22 +256,35 @@ const AddModules = ({
           },
         });
         if (result.data?.updateCustomModule?.success) {
-          toast.success(result.data.updateCustomModule.message || "Module updated successfully", { position: "top-center" });
+          toast.success(
+            result.data.updateCustomModule.message || "Module updated successfully",
+            { position: "top-center" }
+          );
           refetch?.();
           onCancel();
         } else {
-          toast.error(result.data?.updateCustomModule?.message || "Failed to update module", { position: "top-center" });
+          console.log(result)
+          toast.error(
+            result.data?.updateCustomModule?.message || "Failed to update module",
+            { position: "top-center" }
+          );
         }
       } else {
         const result = await createCustomModule({
           variables: { input: inputData },
         });
         if (result.data?.createCustomModule?.success) {
-          toast.success(result.data.createCustomModule.message || "Module created successfully", { position: "top-center" });
+          toast.success(
+            result.data.createCustomModule.message || "Module created successfully",
+            { position: "top-center" }
+          );
           refetch?.();
           onCancel();
         } else {
-          toast.error(result.data?.createCustomModule?.message || "Failed to create module", { position: "top-center" });
+          toast.error(
+            result.data?.createCustomModule?.message || "Failed to create module",
+            { position: "top-center" }
+          );
         }
       }
     } catch (error: any) {
@@ -258,10 +342,9 @@ const AddModules = ({
           <Tabs
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as "basic" | "advanced")}
-            className="flex-1 flex flex-col overflow-hidden"
+            className="flex-1 flex flex-col overflow-hidden px-6 pt-2"
           >
-
-            <TabsList className="grid grid-cols-2 pb-10! mb-4 bg-muted">
+            <TabsList className="grid grid-cols-2 pb-10! bg-muted">
               <TabsTrigger value="basic" className="flex items-center py-2! px-4! gap-2">
                 Basic Info
               </TabsTrigger>
@@ -270,7 +353,7 @@ const AddModules = ({
               </TabsTrigger>
             </TabsList>
 
-            <ScrollArea className="flex-1 px-6 py-4 overflow-y-auto">
+            <ScrollArea className="flex-1 py-4 overflow-y-auto">
               {/* Basic Information Tab */}
               <TabsContent value="basic" className="mt-0 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -291,18 +374,21 @@ const AddModules = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="moduleType">Module Type *</Label>
+                    <Label htmlFor="moduleType">Module Types *</Label>
                     <Controller
                       name="moduleType"
                       control={control}
                       render={({ field }) => (
-                        <Input
-                          {...field}
-                          id="moduleType"
-                          placeholder="e.g., Core, Feature"
+                        <TagInput
+                          value={field.value || []}
+                          onChange={field.onChange}
+                          placeholder="Add a type (e.g., Core, Feature)"
                         />
                       )}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Press Enter or Tab to add a type. Click × to remove.
+                    </p>
                     <FieldErrorDisplay error={errors.moduleType} />
                   </div>
 
@@ -470,7 +556,7 @@ const AddModules = ({
                     These settings determine which roles get this module by default
                   </p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-1">
                     <Card>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -551,7 +637,6 @@ const AddModules = ({
             </ScrollArea>
           </Tabs>
 
-          <Separator />
           <DialogFooter className="px-6 py-4">
             <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
               Cancel

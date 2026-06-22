@@ -29,7 +29,7 @@ import { TbBuildingSkyscraper } from "react-icons/tb";
 
 const CompanyPage = () => {
   const selectedCompanyMember = useAppSelector((state) => state.currentCompanyMember.companyMember);
-  const companyId = selectedCompanyMember?.company?.id;
+  const companyId = selectedCompanyMember?.companyId?.id;
 
   const { data, loading, error } = useQuery<any>(GET_COMPANY_BY_ID, {
     variables: { id: companyId },
@@ -42,6 +42,8 @@ const CompanyPage = () => {
   }
 
   const company = data?.getCompanyById
+
+  console.log({company:company})
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -186,7 +188,7 @@ const CompanyPage = () => {
                       <BsShieldCheck className="text-gray-400" />
                       <span className="text-sm font-medium text-gray-500">Owner Member ID</span>
                     </div>
-                    <p className="text-lg font-mono text-gray-900">{company.ownerIds}</p>
+                    <p className="text-lg font-mono text-gray-900">{`company.ownerIds`}</p>
                   </div>
                 </div>
               </div>

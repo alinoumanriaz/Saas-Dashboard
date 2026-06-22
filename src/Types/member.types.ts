@@ -1,5 +1,5 @@
 import { Address, ModuleAccess, Subscription } from "./common.types";
-import { ModuleName, Permission, PlatformRole } from "@/enums/common.enums";
+import { PlatformRole } from "@/enums/common.enums";
 
 
 export interface Member {

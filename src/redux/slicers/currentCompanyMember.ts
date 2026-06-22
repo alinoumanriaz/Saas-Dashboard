@@ -16,7 +16,7 @@ const currentCompanyMemberSlice = createSlice({
     initialState,
     reducers: {
         setCompanyMember: (state, action: PayloadAction<any>) => {
-            console.log({inredux: action.payload})
+            // console.log({inredux: action.payload})
             state.companyMember = action.payload;
             state.loading = false;
         },

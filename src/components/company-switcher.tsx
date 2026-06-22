@@ -34,7 +34,7 @@ export function CompanySwitcher({
   React.useEffect(() => {
     if (companyMembers?.length) {
       setActiveCompany(companyMembers[0]);
-      // dispatch(setCompanyMember(companyMembers[0]));
+      dispatch(setCompanyMember(companyMembers[0]));
     } else {
       setActiveCompany(null);
     }

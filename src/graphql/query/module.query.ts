@@ -37,7 +37,6 @@ export const GET_ALL_CUSTOM_MODULES = gql`
       moduleIcon
       moduleType
       status
-      parentModule
       order
       isDefaultForOwner
       isDefaultForAdmin
@@ -59,7 +58,10 @@ export const GET_PAGINATED_CUSTOM_MODULES = gql`
         moduleIcon
         moduleType
         status
-        parentModule
+        parentModule {
+        id
+        moduleName
+        }
         order
         isDefaultForOwner
         isDefaultForAdmin
