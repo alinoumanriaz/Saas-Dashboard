@@ -29,7 +29,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -109,7 +108,7 @@ const TagInput = ({ value, onChange, placeholder = "Type and press Enter" }: Tag
             setInputValue("");
           }
         }}
-        className="flex-1 min-w-[120px] border-0 p-0 shadow-none focus-visible:ring-0"
+        className="flex-1 min-w-30 border-0 p-0 shadow-none focus-visible:ring-0"
         placeholder={value.length === 0 ? placeholder : ""}
       />
     </div>
@@ -145,7 +144,7 @@ const AddModules = ({
   selectedData,
   isEditMode,
   refetch,
-  currentMemberId,
+  // currentMemberId,
 }: AddModulesProps) => {
   const [activeTab, setActiveTab] = useState<"basic" | "advanced">("basic");
   const [showRouteHelper, setShowRouteHelper] = useState(false);
@@ -157,7 +156,6 @@ const AddModules = ({
     handleSubmit,
     reset,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<ModuleFormValues>({
     resolver: zodResolver(moduleSchema) as Resolver<ModuleFormValues>,
