@@ -1,690 +1,722 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // src/components/popup/models/AddWebsite.model.tsx
 "use client";
-import React, { useState, useEffect, ChangeEvent } from "react";
-import { useMutation } from "@apollo/client/react"; // Fixed import
+
+import React, { useState, useEffect } from "react";
+import { useMutation } from "@apollo/client/react";
 import { CREATE_WEBSITE, UPDATE_WEBSITE } from "@/graphql/query/website.query";
-import {
-    BiWorld,
-    BiCheckCircle,
-    BiCloud,
-    BiPlus,
-} from "react-icons/bi";
-import {
-    FiDatabase,
-} from "react-icons/fi";
-import { Switch } from "@headlessui/react";
-import { WebsiteStatus, DatabaseType } from "@/enums/common.enums"; // Removed PlatformRole as it's not used
-import { toast } from "react-toastify";
-import Popup from "../Popup";
-import InputBox from "@/components/InputBox";
+import { WebsiteStatus, DatabaseType } from "@/enums/common.enums";
 import { removeTypename } from "@/helpers/removetypename";
 import { useAppSelector } from "@/redux/hooks";
+import { useForm, Controller, FieldError as RHFError } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { toast } from "sonner";
 
+// shadcn/ui components
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { LoaderCircle } from "lucide-react";
+
+// Icons
+import {
+  BiWorld,
+  BiCheckCircle,
+  BiCloud,
+  BiPlus,
+} from "react-icons/bi";
+import { FiDatabase } from "react-icons/fi";
+
+// ===================== Types =====================
 interface AddWebsiteProps {
-    onCancel: () => void;
-    selectedData: any;
-    isEditMode: boolean;
-    refetch: () => void;
-    currentMemberId?: string;
+  onCancel: () => void;
+  selectedData: any;
+  isEditMode: boolean;
+  refetch: () => void;
+  currentMemberId?: string;
 }
 
-interface DatabaseConfig {
-    name: string;
-    type: DatabaseType;
-    host: string;
-    port: number;
-    username: string;
-    password: string;
-}
+// ===================== Zod Schema =====================
+const websiteSchema = z.object({
+  companyId: z.string().min(1, "Company is required"),
+  name: z.string().min(1, "Website name is required"),
+  domain: z
+    .string()
+    .min(1, "Domain is required")
+    .regex(
+      /^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}$/,
+      "Enter a valid domain (e.g., example.com)"
+    ),
+  status: z.nativeEnum(WebsiteStatus),
+  database: z.object({
+    name: z.string().min(1, "Database name is required"),
+    type: z.nativeEnum(DatabaseType),
+    host: z.string().min(1, "Host is required"),
+    port: z.number().min(1, "Port is required"),
+    username: z.string().min(1, "Username is required"),
+    password: z.string().min(1, "Password is required"),
+  }),
+  cloudinary: z
+    .object({
+      folderName: z.string().optional(),
+      cloudinaryName: z.string().optional(),
+      cloudinaryNameApiKey: z.string().optional(),
+      cloudinaryNameApiKeySecret: z.string().optional(),
+    })
+    .optional()
+    .nullable(),
+});
 
-interface CloudinaryInfo {
-    folderName?: string;
-    cloudinaryName?: string;
-    cloudinaryNameApiKey?: string;
-    cloudinaryNameApiKeySecret?: string;
-}
+type WebsiteFormValues = z.infer<typeof websiteSchema>;
 
-interface WebsiteFormData {
-    companyId: string;
-    // companyName: string;
-    name: string;
-    domain: string;
-    status: WebsiteStatus;
-    database: DatabaseConfig;
-    cloudinary?: CloudinaryInfo | null;
-}
+// ===================== Error Display =====================
+const FieldErrorDisplay = ({ error }: { error?: RHFError }) => {
+  if (!error) return null;
+  return <p className="text-sm text-destructive mt-1">{error.message}</p>;
+};
 
+const getNestedError = (errors: any, path: string): RHFError | undefined => {
+  const parts = path.split(".");
+  let current = errors;
+  for (const part of parts) {
+    if (current && typeof current === "object" && part in current) {
+      current = current[part];
+    } else {
+      return undefined;
+    }
+  }
+  return current as RHFError | undefined;
+};
+
+// ===================== Component =====================
 const AddWebsite: React.FC<AddWebsiteProps> = ({
-    onCancel,
-    selectedData,
-    isEditMode,
-    refetch,
-    currentMemberId,
+  onCancel,
+  selectedData,
+  isEditMode,
+  refetch,
 }) => {
-    // Get current company from Redux
-    const currentCompanyMember = useAppSelector((state) => state.currentCompanyMember.companyMember);
-    console.log({currentCompanyMembercurrentCompanyMembercurrentCompanyMember:currentCompanyMember})
-    const currentCompany = currentCompanyMember?.company;
+  const currentCompanyMember = useAppSelector(
+    (state) => state.currentCompanyMember.companyMember
+  );
+  const currentCompany = currentCompanyMember?.companyId;
 
-    const [form, setForm] = useState<WebsiteFormData>({
-        companyId: currentCompany?.id || "", // Initialize with current company ID
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("basic");
+  const [showCloudinary, setShowCloudinary] = useState(false);
+
+  const form = useForm<WebsiteFormValues>({
+    resolver: zodResolver(websiteSchema),
+    defaultValues: {
+      companyId: currentCompany?.id || "",
+      name: "",
+      domain: "",
+      status: WebsiteStatus.ACTIVE,
+      database: {
         name: "",
-        domain: "",
-        status: WebsiteStatus.ACTIVE,
-        database: {
-            name: "",
-            type: DatabaseType.MONGODB,
-            host: "localhost",
-            port: 27017,
-            username: "",
-            password: "",
+        type: DatabaseType.MONGODB,
+        host: "localhost",
+        port: 27017,
+        username: "",
+        password: "",
+      },
+      cloudinary: null,
+    },
+  });
+
+  const {
+    reset,
+    setValue,
+    control,
+    handleSubmit,
+    formState: { errors },
+    setError,
+  } = form;
+
+  // Populate edit data
+  useEffect(() => {
+    if (isEditMode && selectedData) {
+      const mapped: WebsiteFormValues = {
+        companyId: selectedData.companyId || currentCompany?.id || "",
+        name: selectedData.name || "",
+        domain: selectedData.domain || "",
+        status: selectedData.status || WebsiteStatus.ACTIVE,
+        database: selectedData.database || {
+          name: "",
+          type: DatabaseType.MONGODB,
+          host: "localhost",
+          port: 27017,
+          username: "",
+          password: "",
         },
-        cloudinary: null,
-    });
+        cloudinary: selectedData.cloudinary || null,
+      };
+      reset(mapped);
+      setShowCloudinary(!!selectedData.cloudinary);
+    } else {
+      // New: set company from currentCompany
+      setValue("companyId", currentCompany?.id || "");
+    }
+  }, [isEditMode, selectedData, currentCompany, reset, setValue]);
 
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState("basic");
-    const [showCloudinary, setShowCloudinary] = useState(false);
+  // GraphQL mutations
+  const [createWebsite] = useMutation<any>(CREATE_WEBSITE);
+  const [updateWebsite] = useMutation<any>(UPDATE_WEBSITE);
 
-    const tabs = [
-        { id: "basic", label: "Basic Info", icon: <BiWorld className="w-4 h-4" /> },
-        { id: "database", label: "Database", icon: <FiDatabase className="w-4 h-4" /> },
-        { id: "cloudinary", label: "Cloudinary", icon: <BiCloud className="w-4 h-4" /> },
-    ];
-
-    useEffect(() => {
-        if (isEditMode && selectedData) {
-            // Map existing data to form
-            const mappedData: WebsiteFormData = {
-                companyId: selectedData.companyId || currentCompany?.id || "",
-                name: selectedData.name || "",
-                domain: selectedData.domain || "",
-                status: selectedData.status || WebsiteStatus.ACTIVE,
-                database: selectedData.database || {
-                    name: "",
-                    type: DatabaseType.MONGODB,
-                    host: "localhost",
-                    port: 27017,
-                    username: "",
-                    password: "",
-                },
-                cloudinary: selectedData.cloudinary || null,
-            };
-
-            setForm(mappedData);
-            setShowCloudinary(!!selectedData.cloudinary);
-        } else {
-            // For new websites, set the current company as default
-            setForm(prev => ({
-                ...prev,
-                companyId: currentCompany?.id || "",
-            }));
-        }
-    }, [isEditMode, selectedData, currentCompany]); // Removed unnecessary dependencies
-
-    const [createWebsite] = useMutation<any>(CREATE_WEBSITE); // Removed <any> type
-    const [updateWebsite] = useMutation<any>(UPDATE_WEBSITE); // Removed <any> type
-
-    const handleChange = (
-        e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-    ) => {
-        const { name, value, type } = e.target;
-
-        if (name.includes('.')) {
-            // Handle nested properties
-            const [parent, child] = name.split('.');
-
-            if (parent === 'database') {
-                setForm(prev => {
-                    const currentDatabase = prev.database || {
-                        name: "",
-                        type: DatabaseType.MONGODB,
-                        host: "",
-                        port: 27017,
-                        username: "",
-                        password: "",
-                    };
-
-                    return {
-                        ...prev,
-                        database: {
-                            ...currentDatabase,
-                            [child]: child === 'port' ? parseInt(value) || 27017 : value
-                        }
-                    };
-                });
-            } else if (parent === 'cloudinary') {
-                setForm(prev => ({
-                    ...prev,
-                    cloudinary: {
-                        ...(prev.cloudinary || {
-                            folderName: "",
-                            cloudinaryName: "",
-                            cloudinaryNameApiKey: "",
-                            cloudinaryNameApiKeySecret: "",
-                        }),
-                        [child]: value
-                    }
-                }));
+  const onSubmit = async (data: WebsiteFormValues) => {
+    setLoading(true);
+    try {
+      // Build payload
+      const websitePayload = {
+        companyId: data.companyId,
+        name: data.name.trim(),
+        domain: data.domain.trim().toLowerCase(),
+        status: data.status,
+        database: {
+          name: data.database.name.trim(),
+          type: data.database.type,
+          host: data.database.host.trim(),
+          port: data.database.port,
+          username: data.database.username.trim(),
+          password: data.database.password,
+        },
+        ...(showCloudinary && data.cloudinary
+          ? {
+              cloudinary: {
+                folderName: data.cloudinary.folderName?.trim() || "",
+                cloudinaryName: data.cloudinary.cloudinaryName?.trim() || "",
+                cloudinaryNameApiKey:
+                  data.cloudinary.cloudinaryNameApiKey?.trim() || "",
+                cloudinaryNameApiKeySecret:
+                  data.cloudinary.cloudinaryNameApiKeySecret?.trim() || "",
+              },
             }
-        } else {
-            setForm((prev) => ({ ...prev, [name]: value }));
+          : {}),
+      };
+
+      // Validate cloudinary fields if enabled
+      if (showCloudinary) {
+        const cloud = data.cloudinary;
+        if (!cloud?.folderName?.trim()) {
+          setError("cloudinary.folderName", {
+            type: "manual",
+            message: "Folder name is required",
+          });
+          setLoading(false);
+          return;
         }
-
-        // Clear error when user starts typing
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: "" }));
+        if (!cloud.cloudinaryName?.trim()) {
+          setError("cloudinary.cloudinaryName", {
+            type: "manual",
+            message: "Cloudinary name is required",
+          });
+          setLoading(false);
+          return;
         }
-    };
-
-    const validateForm = () => {
-        const newErrors: Record<string, string> = {};
-
-        if (!form.companyId) {
-            newErrors.companyId = "Company is required";
+        if (!cloud.cloudinaryNameApiKey?.trim()) {
+          setError("cloudinary.cloudinaryNameApiKey", {
+            type: "manual",
+            message: "API Key is required",
+          });
+          setLoading(false);
+          return;
         }
-
-        if (!form.name?.trim()) {
-            newErrors.name = "Website name is required";
+        if (!cloud.cloudinaryNameApiKeySecret?.trim()) {
+          setError("cloudinary.cloudinaryNameApiKeySecret", {
+            type: "manual",
+            message: "API Secret is required",
+          });
+          setLoading(false);
+          return;
         }
+      }
 
-        if (!form.domain?.trim()) {
-            newErrors.domain = "Domain is required";
-        } else {
-            // Basic domain validation
-            const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}$/;
-            if (!domainRegex.test(form.domain)) {
-                newErrors.domain = "Please enter a valid domain (e.g., example.com)";
-            }
+      const cleanInput = removeTypename(websitePayload);
+
+      let response;
+      if (isEditMode && selectedData) {
+        response = await updateWebsite({
+          variables: {
+            id: selectedData.id || selectedData._id,
+            input: cleanInput,
+          },
+        });
+        if (response?.error) throw new Error(response.error.message);
+        if (response.data?.updateWebsite) {
+          toast.success("Website updated successfully!", {
+            position: "top-center",
+          });
+          refetch();
+          onCancel();
         }
-
-        // Database validation
-        if (!form.database.name?.trim()) {
-            newErrors['database.name'] = "Database name is required";
+      } else {
+        response = await createWebsite({
+          variables: { input: cleanInput },
+        });
+        if (response?.error) throw new Error(response.error.message);
+        if (response.data?.createWebsite) {
+          toast.success("Website created successfully!", {
+            position: "top-center",
+          });
+          refetch();
+          onCancel();
         }
+      }
+    } catch (error: any) {
+      const msg = error.message || "An error occurred";
+      if (/duplicate|already exists/i.test(msg)) {
+        toast.error(
+          msg.includes("domain")
+            ? "A website with this domain already exists"
+            : "Duplicate entry detected",
+          { position: "top-center" }
+        );
+      } else {
+        toast.error(msg, { position: "top-center" });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        if (!form.database.host?.trim()) {
-            newErrors['database.host'] = "Database host is required";
-        }
+  // Toggle Cloudinary
+  const toggleCloudinary = (enabled: boolean) => {
+    setShowCloudinary(enabled);
+    if (!enabled) {
+      setValue("cloudinary", null);
+    } else {
+      setValue("cloudinary", {
+        folderName: "",
+        cloudinaryName: "",
+        cloudinaryNameApiKey: "",
+        cloudinaryNameApiKeySecret: "",
+      });
+    }
+  };
 
-        if (!form.database.port) {
-            newErrors['database.port'] = "Database port is required";
-        }
+  // ===================== Render =====================
+  return (
+    <Dialog open={true} onOpenChange={() => onCancel()}>
+      <DialogContent className="max-w-4xl! max-h-[90vh] p-0 overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b border-border">
+          <DialogTitle className="text-2xl font-bold">
+            {isEditMode ? "Edit Website" : "Add New Website"}
+          </DialogTitle>
+          <DialogDescription>
+            {isEditMode
+              ? "Update website information"
+              : "Create a new website"}
+            {currentCompany && (
+              <span className="block mt-1 text-xs text-blue-600">
+                Company: {currentCompany.name}
+              </span>
+            )}
+          </DialogDescription>
+        </DialogHeader>
 
-        if (!form.database.username?.trim()) {
-            newErrors['database.username'] = "Database username is required";
-        }
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
+          <ScrollArea className="flex-1 px-6">
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-full"
+            >
+              <TabsList className="grid grid-cols-3 pb-10! mb-4 bg-muted">
+                <TabsTrigger
+                  value="basic"
+                  className="flex items-center py-2! px-4! gap-2"
+                >
+                  <BiWorld className="w-4 h-6" /> Basic Info
+                </TabsTrigger>
+                <TabsTrigger
+                  value="database"
+                  className="flex items-center py-2! px-4! gap-2"
+                >
+                  <FiDatabase className="w-4 h-6" /> Database
+                </TabsTrigger>
+                <TabsTrigger
+                  value="cloudinary"
+                  className="flex items-center py-2! px-4! gap-2"
+                >
+                  <BiCloud className="w-4 h-6" /> Cloudinary
+                </TabsTrigger>
+              </TabsList>
 
-        if (!form.database.password?.trim()) {
-            newErrors['database.password'] = "Database password is required";
-        }
+              {/* Basic Info Tab */}
+              <TabsContent value="basic" className="space-y-6">
+                <div className="bg-muted/50 p-5 rounded-lg border border-border">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center text-foreground">
+                    <BiWorld className="mr-2" /> Website Information
+                  </h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Company (read-only) */}
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Company *
+                      </label>
+                      <div className="mt-1 px-3 py-2 border border-border rounded-lg bg-muted/30 text-foreground">
+                        {currentCompany?.name || "No company selected"}
+                      </div>
+                      <Controller
+                        name="companyId"
+                        control={control}
+                        render={({ field }) => (
+                          <input type="hidden" {...field} />
+                        )}
+                      />
+                    </div>
 
-        console.log({showCloudinary:showCloudinary})
-        // Cloudinary validation (if enabled)
-        if (showCloudinary) {
-            if (!form.cloudinary?.folderName?.trim()) {
-                newErrors['cloudinary.folderName'] = "Folder name is required";
-            }
-            if (!form.cloudinary?.cloudinaryName?.trim()) {
-                newErrors['cloudinary.cloudinaryName'] = "Cloudinary name is required";
-            }
-            if (!form.cloudinary?.cloudinaryNameApiKey?.trim()) {
-                newErrors['cloudinary.cloudinaryNameApiKey'] = "API Key is required";
-            }
-            if (!form.cloudinary?.cloudinaryNameApiKeySecret?.trim()) {
-                newErrors['cloudinary.cloudinaryNameApiKeySecret'] = "API Secret is required";
-            }
-        }
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Website Name *
+                      </label>
+                      <Controller
+                        name="name"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            {...field}
+                            placeholder="My E-commerce Store"
+                          />
+                        )}
+                      />
+                      <FieldErrorDisplay error={errors.name} />
+                    </div>
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Domain *
+                      </label>
+                      <Controller
+                        name="domain"
+                        control={control}
+                        render={({ field }) => (
+                          <Input {...field} placeholder="example.com" />
+                        )}
+                      />
+                      <FieldErrorDisplay error={errors.domain} />
+                    </div>
 
-    const handleSubmit = async () => {
-        if (!validateForm()) {
-            toast.error("Please fix the validation errors before submitting.");
-            return;
-        }
-
-        setLoading(true);
-
-        try {
-            // Build website payload according to schema
-            const websiteData = {
-                companyId: form.companyId,
-                name: form.name.trim(),
-                domain: form.domain.trim().toLowerCase(),
-                status: form.status,
-                database: {
-                    name: form.database.name.trim(),
-                    type: form.database.type,
-                    host: form.database.host.trim(),
-                    port: form.database.port,
-                    username: form.database.username.trim(),
-                    password: form.database.password,
-                },
-                ...(showCloudinary && form.cloudinary ? {
-                    cloudinary: {
-                        ...(form.cloudinary.folderName?.trim() && { folderName: form.cloudinary.folderName.trim() }),
-                        ...(form.cloudinary.cloudinaryName?.trim() && { cloudinaryName: form.cloudinary.cloudinaryName.trim() }),
-                        ...(form.cloudinary.cloudinaryNameApiKey?.trim() && { cloudinaryNameApiKey: form.cloudinary.cloudinaryNameApiKey.trim() }),
-                        ...(form.cloudinary.cloudinaryNameApiKeySecret?.trim() && { cloudinaryNameApiKeySecret: form.cloudinary.cloudinaryNameApiKeySecret.trim() }),
-                    }
-                } : {}),
-            };
-
-            // Clean input by removing __typename
-            const cleanInput = removeTypename(websiteData);
-            console.log({cleanInput:cleanInput})
-
-            let response;
-
-            if (isEditMode && selectedData) {
-                console.log("Updating website with ID:", selectedData.id);
-                console.log("Update payload:", cleanInput);
-
-                response = await updateWebsite({
-                    variables: {
-                        id: selectedData.id || selectedData._id,
-                        input: cleanInput,
-                    },
-                });
-
-                console.log("Update Website Response:", response);
-
-                if (response.data?.updateWebsite) {
-                    toast.success("Website updated successfully!");
-                    refetch();
-                    onCancel();
-                }
-            } else {
-                console.log("Creating website with payload:", cleanInput);
-
-                response = await createWebsite({
-                    variables: {
-                        input: cleanInput,
-                    },
-                });
-
-                console.log("Create Website Response:", response);
-
-                if (response.data?.createWebsite) {
-                    toast.success("Website created successfully!");
-                    refetch();
-                    onCancel();
-                }
-            }
-        } catch (error: any) {
-            console.error("Error submitting form:", error);
-
-            // Handle GraphQL errors
-            const gqlMessage = error?.graphQLErrors?.[0]?.message;
-            const networkError = error?.networkError?.result?.errors?.[0]?.message;
-            const errorMessage = gqlMessage || networkError || error.message || "An error occurred";
-
-            // Handle specific error cases
-            if (errorMessage.includes("duplicate") || errorMessage.includes("already exists")) {
-                if (errorMessage.includes("domain")) {
-                    toast.error("A website with this domain already exists");
-                } else {
-                    toast.error("Duplicate entry detected");
-                }
-            } else if (errorMessage.includes("validation")) {
-                toast.error("Please check all required fields");
-            } else {
-                toast.error(errorMessage);
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const toggleCloudinary = (enabled: boolean) => {
-        setShowCloudinary(enabled);
-        if (!enabled) {
-            setForm(prev => ({ ...prev, cloudinary: null }));
-        } else {
-            setForm(prev => ({
-                ...prev,
-                cloudinary: {
-                    folderName: "",
-                    cloudinaryName: "",
-                    cloudinaryNameApiKey: "",
-                    cloudinaryNameApiKeySecret: "",
-                }
-            }));
-        }
-    };
-
-    return (
-        <Popup>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                {/* Header */}
-                <div className="sticky top-0 bg-white z-30 rounded-t-xl border-b border-gray-100">
-                    <div className="flex justify-between items-center px-6 py-4">
+                    <div className="col-span-2">
+                      <div className="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-900">
-                                {isEditMode ? "Edit Website" : "Add New Website"}
-                            </h2>
-                            <p className="text-sm text-gray-500 mt-1">
-                                {isEditMode
-                                    ? "Update website information"
-                                    : "Create a new website"}
-                                {currentCompany && (
-                                    <span className="block mt-1 text-xs text-blue-600">
-                                        Company: {currentCompany.name}
-                                    </span>
-                                )}
-                            </p>
+                          <p className="font-medium text-foreground">
+                            Website Status
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Active or Inactive
+                          </p>
                         </div>
-                        <div className="flex items-center space-x-3">
-                            <button
-                                onClick={onCancel}
-                                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
-                                disabled={loading}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSubmit}
-                                disabled={loading}
-                                className={`px-4 py-2 text-white rounded-lg font-medium text-sm flex items-center ${loading
-                                        ? "bg-blue-400 cursor-not-allowed"
-                                        : "bg-blue-600 hover:bg-blue-700 transition-colors"
-                                    }`}
-                            >
-                                {loading ? (
-                                    <>
-                                        <svg
-                                            className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                className="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                strokeWidth="4"
-                                            ></circle>
-                                            <path
-                                                className="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                        </svg>
-                                        Processing...
-                                    </>
-                                ) : (
-                                    <>
-                                        {isEditMode ? (
-                                            <>
-                                                <BiCheckCircle className="mr-2" />
-                                                Update Website
-                                            </>
-                                        ) : (
-                                            <>
-                                                <BiPlus className="mr-2" />
-                                                Create Website
-                                            </>
-                                        )}
-                                    </>
-                                )}
-                            </button>
-                        </div>
+                        <Controller
+                          name="status"
+                          control={control}
+                          render={({ field }) => (
+                            <Switch
+                              checked={field.value === WebsiteStatus.ACTIVE}
+                              onCheckedChange={(checked) =>
+                                field.onChange(
+                                  checked
+                                    ? WebsiteStatus.ACTIVE
+                                    : WebsiteStatus.INACTIVE
+                                )
+                              }
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Database Tab */}
+              <TabsContent value="database" className="space-y-6">
+                <div className="bg-muted/50 p-5 rounded-lg border border-border">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center text-foreground">
+                    <FiDatabase className="mr-2" /> Database Configuration
+                  </h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Database Name *
+                      </label>
+                      <Controller
+                        name="database.name"
+                        control={control}
+                        render={({ field }) => (
+                          <Input {...field} placeholder="myapp_database" />
+                        )}
+                      />
+                      <FieldErrorDisplay
+                        error={getNestedError(errors, "database.name")}
+                      />
                     </div>
 
-                    {/* Tab Navigation */}
-                    <div className="px-6 bg-gray-50">
-                        <nav className="flex space-x-1 overflow-x-auto">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center px-4 py-3 rounded-t-lg transition-colors text-sm font-medium ${activeTab === tab.id
-                                            ? "bg-white text-blue-700 border-t-2 border-x-2 border-gray-200 border-b-0"
-                                            : "text-gray-600 hover:text-blue-600 hover:bg-white/50"
-                                        }`}
-                                >
-                                    <span className="mr-2">{tab.icon}</span>
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </nav>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Database Type *
+                      </label>
+                      <Controller
+                        name="database.type"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={DatabaseType.MONGODB}>
+                                MongoDB
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      <FieldErrorDisplay
+                        error={getNestedError(errors, "database.type")}
+                      />
                     </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Host *
+                      </label>
+                      <Controller
+                        name="database.host"
+                        control={control}
+                        render={({ field }) => (
+                          <Input {...field} placeholder="localhost" />
+                        )}
+                      />
+                      <FieldErrorDisplay
+                        error={getNestedError(errors, "database.host")}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Port *
+                      </label>
+                      <Controller
+                        name="database.port"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value) || 27017)
+                            }
+                            placeholder="27017"
+                          />
+                        )}
+                      />
+                      <FieldErrorDisplay
+                        error={getNestedError(errors, "database.port")}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Username *
+                      </label>
+                      <Controller
+                        name="database.username"
+                        control={control}
+                        render={({ field }) => (
+                          <Input {...field} placeholder="db_user" />
+                        )}
+                      />
+                      <FieldErrorDisplay
+                        error={getNestedError(errors, "database.username")}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Password *
+                      </label>
+                      <Controller
+                        name="database.password"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            type="password"
+                            {...field}
+                            placeholder="••••••••"
+                          />
+                        )}
+                      />
+                      <FieldErrorDisplay
+                        error={getNestedError(errors, "database.password")}
+                      />
+                    </div>
+                  </div>
                 </div>
+              </TabsContent>
 
-                <div className="p-6">
-                    {/* Basic Information Tab */}
-                    {activeTab === "basic" && (
-                        <div className="space-y-6">
-                            <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                                    <BiWorld className="mr-2" />
-                                    Website Information
-                                </h3>
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* Company Selection */}
-                                    <div className="col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Company *
-                                        </label>
-                                        <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700">
-                                            {currentCompany?.name || "Loading..."}
-                                        </div>
-                                        {errors.company && (
-                                            <p className="mt-1 text-xs text-red-500">{errors.company}</p>
-                                        )}
-                                    </div>
+              {/* Cloudinary Tab */}
+              <TabsContent value="cloudinary" className="space-y-6">
+                <div className="bg-muted/50 p-5 rounded-lg border border-border">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold flex items-center text-foreground">
+                      <BiCloud className="mr-2" /> Cloudinary Configuration
+                    </h3>
+                    <Switch
+                      checked={showCloudinary}
+                      onCheckedChange={toggleCloudinary}
+                    />
+                  </div>
 
-                                    <InputBox
-                                        type="text"
-                                        label="Website Name *"
-                                        name="name"
-                                        value={form.name}
-                                        onChange={handleChange}
-                                        placeholder="My E-commerce Store"
-                                        error={errors.name}
-                                    />
-
-                                    <InputBox
-                                        type="text"
-                                        label="Domain *"
-                                        name="domain"
-                                        value={form.domain}
-                                        onChange={handleChange}
-                                        placeholder="example.com"
-                                        error={errors.domain}
-                                    />
-
-                                    <div className="col-span-2">
-                                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                                            <div>
-                                                <p className="font-medium text-gray-900">Website Status</p>
-                                                <p className="text-sm text-gray-500">Enable or disable website</p>
-                                            </div>
-                                            <Switch
-                                                checked={form.status === WebsiteStatus.ACTIVE}
-                                                onChange={(value: boolean) =>
-                                                    setForm(prev => ({
-                                                        ...prev,
-                                                        status: value ? WebsiteStatus.ACTIVE : WebsiteStatus.INACTIVE
-                                                    }))
-                                                }
-                                                className={`${form.status === WebsiteStatus.ACTIVE ? "bg-green-600" : "bg-gray-200"
-                                                    } relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
-                                            >
-                                                <span
-                                                    className={`${form.status === WebsiteStatus.ACTIVE ? "translate-x-6" : "translate-x-1"
-                                                        } inline-block h-4 w-4 transform rounded-full bg-white transition`}
-                                                />
-                                            </Switch>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Database Tab */}
-                    {activeTab === "database" && (
-                        <div className="space-y-6">
-                            <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                                    <FiDatabase className="mr-2" />
-                                    Database Configuration
-                                </h3>
-
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <InputBox
-                                        type="text"
-                                        label="Database Name *"
-                                        name="database.name"
-                                        value={form.database.name}
-                                        onChange={handleChange}
-                                        placeholder="myapp_database"
-                                        error={errors['database.name']}
-                                    />
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Database Type *
-                                        </label>
-                                        <select
-                                            name="database.type"
-                                            value={form.database.type}
-                                            onChange={handleChange}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                        >
-                                            <option value={DatabaseType.MONGODB}>MongoDB</option>
-                                        </select>
-                                    </div>
-
-                                    <InputBox
-                                        type="text"
-                                        label="Host *"
-                                        name="database.host"
-                                        value={form.database.host}
-                                        onChange={handleChange}
-                                        placeholder="localhost"
-                                        error={errors['database.host']}
-                                    />
-
-                                    <InputBox
-                                        type="number"
-                                        label="Port *"
-                                        name="database.port"
-                                        value={form.database.port.toString()}
-                                        onChange={handleChange}
-                                        placeholder="27017"
-                                        error={errors['database.port']}
-                                    />
-
-                                    <InputBox
-                                        type="text"
-                                        label="Username *"
-                                        name="database.username"
-                                        value={form.database.username}
-                                        onChange={handleChange}
-                                        placeholder="db_user"
-                                        error={errors['database.username']}
-                                    />
-
-                                    <InputBox
-                                        type="password"
-                                        label="Password *"
-                                        name="database.password"
-                                        value={form.database.password}
-                                        onChange={handleChange}
-                                        placeholder="••••••••"
-                                        error={errors['database.password']}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Cloudinary Tab */}
-                    {activeTab === "cloudinary" && (
-                        <div className="space-y-6">
-                            <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                                        <BiCloud className="mr-2" />
-                                        Cloudinary Configuration
-                                    </h3>
-                                    <Switch
-                                        checked={showCloudinary}
-                                        onChange={toggleCloudinary}
-                                        className={`${showCloudinary ? "bg-blue-600" : "bg-gray-200"
-                                            } relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
-                                    >
-                                        <span
-                                            className={`${showCloudinary ? "translate-x-6" : "translate-x-1"
-                                                } inline-block h-4 w-4 transform rounded-full bg-white transition`}
-                                        />
-                                    </Switch>
-                                </div>
-
-                                {showCloudinary && (
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <InputBox
-                                            type="text"
-                                            label="Folder Name *"
-                                            name="cloudinary.folderName"
-                                            value={form.cloudinary?.folderName || ""}
-                                            onChange={handleChange}
-                                            placeholder="myapp-images"
-                                            error={errors['cloudinary.folderName']}
-                                        />
-
-                                        <InputBox
-                                            type="text"
-                                            label="Cloudinary Name *"
-                                            name="cloudinary.cloudinaryName"
-                                            value={form.cloudinary?.cloudinaryName || ""}
-                                            onChange={handleChange}
-                                            placeholder="mycloud"
-                                            error={errors['cloudinary.cloudinaryName']}
-                                        />
-
-                                        <InputBox
-                                            type="text"
-                                            label="API Key *"
-                                            name="cloudinary.cloudinaryNameApiKey"
-                                            value={form.cloudinary?.cloudinaryNameApiKey || ""}
-                                            onChange={handleChange}
-                                            placeholder="123456789012345"
-                                            error={errors['cloudinary.cloudinaryNameApiKey']}
-                                        />
-
-                                        <InputBox
-                                            type="password"
-                                            label="API Secret *"
-                                            name="cloudinary.cloudinaryNameApiKeySecret"
-                                            value={form.cloudinary?.cloudinaryNameApiKeySecret || ""}
-                                            onChange={handleChange}
-                                            placeholder="••••••••"
-                                            error={errors['cloudinary.cloudinaryNameApiKeySecret']}
-                                        />
-                                    </div>
-                                )}
-
-                                {!showCloudinary && (
-                                    <p className="text-sm text-gray-500 text-center py-4">
-                                        Cloudinary integration is disabled. Toggle the switch to enable it.
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                  {showCloudinary ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Folder Name *
+                        </label>
+                        <Controller
+                          name="cloudinary.folderName"
+                          control={control}
+                          render={({ field }) => (
+                            <Input {...field} placeholder="myapp-images" />
+                          )}
+                        />
+                        <FieldErrorDisplay
+                          error={getNestedError(errors, "cloudinary.folderName")}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Cloudinary Name *
+                        </label>
+                        <Controller
+                          name="cloudinary.cloudinaryName"
+                          control={control}
+                          render={({ field }) => (
+                            <Input {...field} placeholder="mycloud" />
+                          )}
+                        />
+                        <FieldErrorDisplay
+                          error={getNestedError(
+                            errors,
+                            "cloudinary.cloudinaryName"
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          API Key *
+                        </label>
+                        <Controller
+                          name="cloudinary.cloudinaryNameApiKey"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              placeholder="123456789012345"
+                            />
+                          )}
+                        />
+                        <FieldErrorDisplay
+                          error={getNestedError(
+                            errors,
+                            "cloudinary.cloudinaryNameApiKey"
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          API Secret *
+                        </label>
+                        <Controller
+                          name="cloudinary.cloudinaryNameApiKeySecret"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              type="password"
+                              {...field}
+                              placeholder="••••••••"
+                            />
+                          )}
+                        />
+                        <FieldErrorDisplay
+                          error={getNestedError(
+                            errors,
+                            "cloudinary.cloudinaryNameApiKeySecret"
+                          )}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Cloudinary integration is disabled. Toggle the switch to
+                      enable it.
+                    </p>
+                  )}
                 </div>
-            </div>
-        </Popup>
-    );
+              </TabsContent>
+            </Tabs>
+          </ScrollArea>
+
+          <DialogFooter className="mt-4 border-t border-border px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <LoaderCircle className="animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  {isEditMode ? (
+                    <>
+                      <BiCheckCircle className="mr-2" /> Update Website
+                    </>
+                  ) : (
+                    <>
+                      <BiPlus className="mr-2" /> Create Website
+                    </>
+                  )}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 export default AddWebsite;

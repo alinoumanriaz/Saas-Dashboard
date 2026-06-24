@@ -26,6 +26,7 @@ import {
   MdOutlineLocationCity,
 } from "react-icons/md";
 import { TbBuildingSkyscraper } from "react-icons/tb";
+import Image from "next/image";
 
 const CompanyPage = () => {
   const selectedCompanyMember = useAppSelector((state) => state.currentCompanyMember.companyMember);
@@ -43,7 +44,7 @@ const CompanyPage = () => {
 
   const company = data?.getCompanyById
 
-  console.log({company:company})
+  console.log({ company: company })
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -112,9 +113,11 @@ const CompanyPage = () => {
               <div className="flex items-center space-x-6">
                 <div className="h-24 w-24 bg-linear-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
                   {company.logo ? (
-                    <img
+                    <Image
                       src={company.logo}
                       alt={company.name}
+                      width={20}
+                      height={20}
                       className="h-16 w-16 object-cover rounded-lg"
                     />
                   ) : (
