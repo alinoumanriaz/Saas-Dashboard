@@ -6,7 +6,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { getLucideIcon } from "@/helpers/LucidIconFinder"
+import { DynamicIcon } from "@/helpers/LucidIconFinder"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -22,13 +22,12 @@ export function NavAppManagement({
       <SidebarGroupLabel>App Management</SidebarGroupLabel>
       <SidebarMenu>
         {details.map((item: any, index: number) => {
-          const Icon = getLucideIcon(item.moduleId.moduleIcon)
           const isActive = pathname === item.moduleId.route
           return (
           <SidebarMenuItem key={index}>
             <SidebarMenuButton asChild isActive={isActive}>
               <Link href={item.moduleId.route}>
-                <Icon />
+                <DynamicIcon name={item.moduleId.moduleIcon} />
                 <span>{item.moduleId.moduleName}</span>
               </Link>
             </SidebarMenuButton>

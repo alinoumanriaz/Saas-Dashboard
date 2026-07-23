@@ -180,7 +180,7 @@ const TableBox = ({
       )}
 
       <div className="flex-1 overflow-hidden rounded-lg border border-border">
-          <Table className="w-full ">
+          <Table className="w-full " tableHeight={height}>
             <TableHeader className="sticky top-0 z-20 bg-background backdrop-blur-sm">
               <TableRow className="hover:bg-transparent">
                 {checkbox && (
@@ -580,7 +580,7 @@ const TableBox = ({
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-4">
+        <div className="">
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}

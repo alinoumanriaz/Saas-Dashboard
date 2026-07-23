@@ -5,7 +5,6 @@ import { useForm, Controller, useWatch, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { generateSlug } from "@/helpers/slug-maker";
-import { getLucideIcon } from "@/helpers/LucidIconFinder";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +37,7 @@ import {
 } from "../../../graphql/query/module.query";
 import { LoaderCircle, Settings, Shield, Crown, Star, Lock, X } from "lucide-react";
 import { toast } from "sonner";
+import { DynamicIcon } from "@/helpers/LucidIconFinder";
 
 // ===================== Enums =====================
 enum ModuleStatus {
@@ -402,12 +402,11 @@ const AddModules = ({
                           </SelectTrigger>
                           <SelectContent>
                             {availableIcons.map((icon) => {
-                              const Icon = getLucideIcon(icon);
                               return (
                                 <SelectItem key={icon} value={icon}>
                                   <div className="flex items-center gap-2">
                                     <div className="flex size-9 items-center justify-center">
-                                      <Icon className="size-4 text-muted-foreground" />
+                                      <DynamicIcon name={icon} className="size-4 text-muted-foreground" />
                                     </div>
                                     <span className="text-sm">{icon}</span>
                                   </div>

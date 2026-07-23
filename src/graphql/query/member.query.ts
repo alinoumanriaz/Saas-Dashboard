@@ -111,7 +111,9 @@ export const GET_CURRENT_MEMBER = gql`
             id
             moduleName
             route
+            order
             moduleIcon
+            moduleType
             description
             status
           }

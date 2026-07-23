@@ -11,6 +11,7 @@ export interface DatabaseConfig {
 }
 
 export interface Website {
+  id: string;
   name: string;
   domain: string;
   status: WebsiteStatus;

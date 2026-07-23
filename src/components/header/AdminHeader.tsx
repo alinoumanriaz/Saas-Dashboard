@@ -6,7 +6,6 @@ import { ModeToggle } from "../mode-toggle";
 
 const AdminHeader = () => {
   const pathName = usePathname();
-  const currentMember = useAppSelector((state) => state.currentMember.member);
   const { companyMember, loading } = useAppSelector((state) => state.currentCompanyMember);
   const websitesOfSelectedCompanyOfCurrentMember = companyMember?.websites || [];
   console.log({ websitesOfSelectedCompanyOfCurrentMember: websitesOfSelectedCompanyOfCurrentMember })
@@ -17,7 +16,7 @@ const AdminHeader = () => {
   return (
     <div className="sticky top-0 z-50 w-full flex justify-between items-center text-sm py-2 pr-4 px-2">
       <div className="flex justify-center items-center space-x-3">
-        {currentMember?.role !== "SUPER_ADMIN" && !loading && (
+        {!loading && (
           <WebsiteSwitcher websites={websitesOfSelectedCompanyOfCurrentMember} />
         )}
       </div>

@@ -32,7 +32,12 @@ export const GET_PAGINATED_COMPANY_MEMBERS = gql`
         }
         role
         status
-        websites
+        websites {
+          id
+          name
+          domain
+          status
+          }
         createdAt
         updatedAt
       }
@@ -91,7 +96,8 @@ query {
           id
           name
           domain
-        }
+          status
+          }
         createdAt
         updatedAt
     }
@@ -115,9 +121,14 @@ query GetCompaniesOfCurrentMemberById($id: String!) {
       }
       role
       status
-      websites
+      websites {
+      id
+      name
+      domain
+      status
+      }
       modules {
-          moduleId {
+        moduleId {
           id
           moduleName
           moduleIcon
@@ -125,9 +136,9 @@ query GetCompaniesOfCurrentMemberById($id: String!) {
           route
           status
           moduleType
-          parentModule{
-          id
-          moduleName
+          parentModule {
+            id
+            moduleName
           }
           order
           }

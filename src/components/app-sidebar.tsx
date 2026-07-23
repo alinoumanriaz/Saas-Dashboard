@@ -15,54 +15,83 @@ import {
 } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/nav-user";
 import { CompanySwitcher } from "@/components/company-switcher";
-import { NavAppManagement } from "./nav-app-management";
-import { NavCompanyManagement } from "./nav-company-management";
-
-
-
+import { NavManagement } from "./nav-management";
 
 type GroupedModules = Record<string, any[]>;
 
-// ========== Utility Function (pure, memoizable) ==========
-function getActiveModulesGroupedByType(
-  modules: any[]
-): GroupedModules {
-  const grouped: GroupedModules = {};
+function buildMenuTree(modules: any[]) {
+  const map = new Map<string, any>();
+  const tree: any[] = [];
 
-  // Filter active modules
-  const active = modules.filter(
-    (access) => access.isActive === true && access.moduleId?.status === "ACTIVE"
-  );
-
-  // Group by moduleType
-  active.forEach((access) => {
-    const singleModule = access.moduleId;
-    const types =
-      Array.isArray(singleModule.moduleType) && singleModule.moduleType.length > 0
-        ? singleModule.moduleType
-        : ["unknown"];
-
-    types.forEach((type: any) => {
-      if (!grouped[type]) grouped[type] = [];
-      // Avoid duplicates (unlikely but safe)
-      const exists = grouped[type].some((item) => item.moduleId.id === singleModule.id);
-      if (!exists) grouped[type].push(access);
+  modules.forEach((item) => {
+    map.set(item.moduleId.id, {
+      ...item,
+      children: [],
     });
   });
 
-  // Sort each group by order (ascending)
-  Object.keys(grouped).forEach((type) => {
-    grouped[type].sort((a, b) => {
-      const orderA = a.moduleId.order ?? 0;
-      const orderB = b.moduleId.order ?? 0;
-      return orderA - orderB;
+  modules.forEach((item) => {
+    const parentId = item.moduleId.parentModule?.id;
+    const node = map.get(item.moduleId.id);
+    if (parentId && map.has(parentId)) {
+      map.get(parentId).children.push(node);
+    } else {
+      tree.push(node);
+    }
+  });
+
+  const sortTree = (items: any[]) => {
+    items.sort((a, b) => (a.moduleId.order ?? 0) - (b.moduleId.order ?? 0));
+    items.forEach((item) => sortTree(item.children));
+  };
+
+  sortTree(tree);
+  return tree;
+}
+
+function getActiveModulesGroupedByType(modules: any[]): GroupedModules {
+  const grouped: GroupedModules = {};
+
+  const activeModules = modules.filter(
+    (access) =>
+      access.isActive &&
+      access.moduleId &&
+      access.moduleId.status === "ACTIVE"
+  );
+
+  activeModules.forEach((access) => {
+    const types =
+      Array.isArray(access.moduleId.moduleType) &&
+      access.moduleId.moduleType.length
+        ? access.moduleId.moduleType
+        : ["unknown"];
+
+    types.forEach((type: string) => {
+      if (!grouped[type]) grouped[type] = [];
+
+      const exists = grouped[type].some(
+        (item) => item.moduleId.id === access.moduleId.id
+      );
+
+      if (!exists) {
+        grouped[type].push(access);
+      }
     });
+  });
+
+  Object.keys(grouped).forEach((type) => {
+    grouped[type].sort(
+      (a, b) => (a.moduleId.order ?? 0) - (b.moduleId.order ?? 0)
+    );
+  });
+
+  Object.keys(grouped).forEach((type) => {
+    grouped[type] = buildMenuTree(grouped[type]);
   });
 
   return grouped;
 }
 
-// ========== Component ==========
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const dispatch = useAppDispatch();
   const currentMember = useAppSelector((state) => state.currentMember.member);
@@ -70,7 +99,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     (state) => state.currentCompanyMember
   );
 
-  // 1. Fetch all company memberships
   const {
     data,
     loading: queryLoading,
@@ -86,12 +114,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     fetchPolicy: "network-only",
   });
 
+  console.log({compa:data})
+
   const companyMembers = React.useMemo(
     () => data?.getCompaniesOfCurrentMemberById?.companyMembers ?? [],
     [data]
   );
 
-  // 2. Sync Redux store with the latest query data
+  // Sync Redux store with the latest query data
   React.useEffect(() => {
     if (!companyMembers.length) return;
 
@@ -104,27 +134,67 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       );
     }
 
-    // If no previously selected company or it no longer exists, pick the first
     if (!freshMember) {
       freshMember = companyMembers[0];
     }
 
-    // Update Redux only if the data actually changed
     if (freshMember && freshMember.id !== selectedCompanyMember?.id) {
       dispatch(setCompanyMember(freshMember));
     }
   }, [companyMembers, selectedCompanyMember, dispatch]);
 
-  // 3. Compute grouped modules (memoized)
+  // Memoized grouped modules
   const groupedModules = React.useMemo(
     () => getActiveModulesGroupedByType(selectedCompanyMember?.modules ?? []),
     [selectedCompanyMember?.modules]
   );
 
-  const companyModules = groupedModules.company ?? [];
+  const appGroupedModules = React.useMemo(
+    () => getActiveModulesGroupedByType(currentMember?.modules ?? []),
+    [currentMember?.modules]
+  );
 
-  // 4. Error state
+  // ✅ Merge company & app modules for Super Admin without losing data
+  const allGroupedModules = React.useMemo(() => {
+    const base = { ...groupedModules };
+
+    if (currentMember?.role === "SUPER_ADMIN") {
+      Object.entries(appGroupedModules).forEach(([key, modules]) => {
+        if (base[key]) {
+          // Combine existing + new modules and deduplicate by ID
+          const combined = [...base[key], ...modules];
+          const seen = new Set<string>();
+          const unique = combined.filter((item) => {
+            const id = item.moduleId.id;
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+          base[key] = unique;
+        } else {
+          base[key] = modules;
+        }
+      });
+    }
+
+    return base;
+  }, [groupedModules, appGroupedModules, currentMember?.role]);
+
+  const orderedGroups = React.useMemo(() => {
+    const order: Record<string, number> = {
+      modules: 0,
+      website: 1,
+      company: 2,
+      app: 3,
+    };
+    return Object.entries(allGroupedModules).sort(
+      ([a], [b]) => (order[a] ?? 999) - (order[b] ?? 999)
+    );
+  }, [allGroupedModules]);
+
+  // Error state
   if (queryError) {
+    console.error("AppSidebar query error:", queryError);
     return (
       <Sidebar {...props}>
         <SidebarHeader className="p-4 text-destructive">
@@ -132,7 +202,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <button
             type="button"
             onClick={() => refetch()}
-            className="text-sm underline mt-1"
+            className="text-sm underline mt-1 cursor-pointer"
           >
             Retry
           </button>
@@ -141,41 +211,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     );
   }
 
-  // 5. Loading state
+  // Loading state
   if (queryLoading || !currentMember) {
     return (
-      <div className="h-full bg-red-400!">
-        <Sidebar {...props}>
-          <SidebarHeader className="mt-2 p-4">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-          </SidebarHeader>
-          <div>
-            <div className="">
-              <SidebarContent className="space-y-2 p-4">
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-              </SidebarContent>
-              <SidebarContent className="space-y-2 p-4">
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-              </SidebarContent>
-            </div>
-          </div>
-        </Sidebar>
-      </div>
+      <Sidebar {...props}>
+        <SidebarHeader className="mt-2 p-4 space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </SidebarHeader>
+        <SidebarContent className="space-y-2 p-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-6 w-full" />
+          ))}
+        </SidebarContent>
+      </Sidebar>
     );
   }
 
-  // 6. Main render
+  // Main render
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="mt-2">
@@ -183,13 +236,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Company Management (visible to all) */}
-        <NavCompanyManagement details={companyModules} />
-
-        {/* Super Admin extra navigation */}
-        {currentMember?.role === "SUPER_ADMIN" && (
-          <NavAppManagement details={currentMember?.modules ?? []} />
-        )}
+        {orderedGroups.map(([moduleType, modules]) => (
+          <NavManagement
+            key={moduleType}
+            title={moduleType}
+            details={modules}
+          />
+        ))}
       </SidebarContent>
 
       <SidebarFooter>

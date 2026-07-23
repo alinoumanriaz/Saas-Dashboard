@@ -63,6 +63,11 @@ const LoginForm = ({
       });
 
       console.log({ loginRes: data, error });
+      if (error) {
+        setNewError(error.message || "An error occurred during login. Please try again.");
+        setLoading(false);
+        return;
+      }
 
       if (data?.loginMember) {
         dispatch(setMember(data?.loginMember));

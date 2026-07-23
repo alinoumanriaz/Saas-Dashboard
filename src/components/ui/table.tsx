@@ -4,11 +4,11 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({ tableHeight, className, ...props }: any) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto scrollbar-hide"
+      className={`relative w-full overflow-x-auto scrollbar-hide ${tableHeight}`}
     >
       <table
         data-slot="table"
@@ -23,7 +23,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn("border-b-2", className)}
       {...props}
     />
   )

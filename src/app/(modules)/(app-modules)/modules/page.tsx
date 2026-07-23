@@ -19,12 +19,12 @@ import {
   RefreshCw,
   Calendar,
 } from "lucide-react";
-import { getLucideIcon } from "@/helpers/LucidIconFinder";
 import { Field } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { DynamicIcon } from "@/helpers/LucidIconFinder";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 8;
 
 const Page = () => {
   const currentMember = useAppSelector((state) => state.currentMember.member);
@@ -46,14 +46,14 @@ const Page = () => {
 
   const { data, loading, error, refetch, networkStatus } = useQuery<any>(GET_PAGINATED_CUSTOM_MODULES, {
     variables: {
-      page: 1,
+      page: state.currentPage,
       limit: Number(ITEMS_PER_PAGE) || 10,
     },
     fetchPolicy: "network-only",
   });
 
   console.log({ dataa: data })
-  const showTableLoading = loading && networkStatus === 1;
+  const showTableLoading = loading && networkStatus === 2;
 
   const allModules: Module[] = data?.getPaginatedCustomModules?.customModules || [];
   const totalModules = data?.getPaginatedCustomModules?.totalCustomModulesCount || 0;
@@ -232,25 +232,24 @@ const Page = () => {
                 action={true}
                 loading={showTableLoading}
                 data={tableData}
-                currentPage={1}
+                currentPage={state.currentPage}
                 totalPages={totalPages}
                 setCurrentPage={(page) =>
                   dispatch({ type: "SET_PAGE", payload: page })
                 }
                 deletehandler={deleteHandler}
                 edithandler={editHandler}
-                height="max-h-[calc(100vh-180px)]"
+                height="max-h-[calc(100vh-220px)]"
                 status={false}
                 createdAt={false}
                 updatedAt={false}
                 customRenderers={{
                   moduleName: (value, row) => {
-                    const Icon = getLucideIcon(row.moduleIcon);
 
                     return (
                       <div className="flex items-center gap-3">
                         <div className="flex size-9 items-center justify-center rounded-lg bg-muted">
-                          <Icon className="size-4 text-muted-foreground" />
+                          <DynamicIcon name={row.moduleIcon}  className="size-4 text-muted-foreground" />
                         </div>
 
                         <div>

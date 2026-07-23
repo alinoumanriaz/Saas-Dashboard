@@ -58,7 +58,7 @@ export enum APP_MODULES {
 }
 
 export enum Permission {
-    CREATE = 'CREATE',
+    WRITE = 'WRITE',
     READ = 'READ',
     UPDATE = 'UPDATE',
     DELETE = 'DELETE',

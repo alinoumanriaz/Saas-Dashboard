@@ -94,7 +94,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { LoaderCircle } from "lucide-react";
-import { getLucideIcon } from "@/helpers/LucidIconFinder";
+import { DynamicIcon } from "@/helpers/LucidIconFinder";
 
 // ===================== Types & Schemas =====================
 // FIXED: moduleId is now an object (as it comes from your data)
@@ -147,6 +147,8 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
   currentTeamId,
   currentUserRole,
 }) => {
+
+  console.log({selectedData:selectedData})
   // --- State ---
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -258,7 +260,7 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
   // --- Load edit data ---
   useEffect(() => {
     if (selectedData && isEditMode) {
-      setSelectedMember(selectedData.member || null);
+      setSelectedMember(selectedData.memberId || null);
 
       // Merge existing modules with modulesList to preserve full list
       reset({
@@ -374,6 +376,7 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
       }));
 
       const input = {
+        id: selectedData.id,
         memberId: data.memberId,
         companyId: currentCompanyId,
         teamId: currentTeamId || undefined,
@@ -486,7 +489,7 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
 
             <ScrollArea className="flex-1 p-6">
               {/* ----- Basic Info Tab ----- */}
-              <TabsContent value="basic" className="mt-0">
+              <TabsContent value="basic" className="mt-0 p-1">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Member Selection - Combobox */}
                   <Card>
@@ -701,7 +704,7 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
               </TabsContent>
 
               {/* ----- Role & Status Tab ----- */}
-              <TabsContent value="role" className="mt-0">
+              <TabsContent value="role" className="mt-0 p-1">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card>
                     <CardHeader>
@@ -720,7 +723,7 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                             value={field.value}
                             disabled={isSubmitting}
                           >
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full py-8">
                               <SelectValue placeholder="Select a role" />
                             </SelectTrigger>
                             <SelectContent>
@@ -733,7 +736,7 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                                     key={role.value}
                                     value={role.value}
                                   >
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 py-2">
                                       <div
                                         className={`p-1.5 rounded-md bg-${role.color}-100`}
                                       >
@@ -780,7 +783,7 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                             value={field.value}
                             disabled={isSubmitting}
                           >
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full py-8">
                               <SelectValue placeholder="Select a status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -791,7 +794,7 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                                     key={status.value}
                                     value={status.value}
                                   >
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 py-2">
                                       <div
                                         className={`p-1.5 rounded-md bg-${status.color}-100`}
                                       >
@@ -822,8 +825,8 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
               </TabsContent>
 
               {/* ----- Modules Tab ----- */}
-              <TabsContent value="modules" className="mt-0">
-                <Card>
+              <TabsContent value="modules" className="mt-0  overflow-auto! h-92">
+                <Card className="">
                   <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div>
@@ -864,7 +867,6 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                         module?.moduleId.moduleName || "Unnamed";
                       const iconName =
                         module?.moduleId.moduleIcon || "FiDatabase";
-                      const Icon = getLucideIcon(iconName) || FiDatabase;
 
                       return (
                         <div
@@ -891,7 +893,8 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                                     : "bg-muted"
                                 }`}
                               >
-                                <Icon
+                                <DynamicIcon
+                                  name={iconName}
                                   className={`h-5 w-5 ${
                                     module.isActive
                                       ? "text-primary"
@@ -1220,7 +1223,6 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                   </>
                 ) : isEditMode ? (
                   <>
-                    <BiCheckCircle className="mr-2" />
                     Update Member
                   </>
                 ) : (
