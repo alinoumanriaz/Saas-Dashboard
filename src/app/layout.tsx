@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
-      <body className="antialiased overflow-x-hidden">
+      <body className="antialiased overflow-x-hidden bg-gray-100">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

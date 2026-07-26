@@ -97,7 +97,6 @@ import { LoaderCircle } from "lucide-react";
 import { DynamicIcon } from "@/helpers/LucidIconFinder";
 
 // ===================== Types & Schemas =====================
-// FIXED: moduleId is now an object (as it comes from your data)
 const moduleSchema = z.object({
   moduleId: z.object({
     id: z.string(),
@@ -110,7 +109,6 @@ const moduleSchema = z.object({
   permissions: z.array(z.string()),
 });
 
-// FIXED: removed the misplaced `moduleId` field; added only needed fields
 const formSchema = z.object({
   memberId: z.string().min(1, "Please select a member"),
   role: z.enum(CompanyMemberRole),
@@ -147,8 +145,6 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
   currentTeamId,
   currentUserRole,
 }) => {
-
-  console.log({selectedData:selectedData})
   // --- State ---
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -163,30 +159,11 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
   const currentMember = useAppSelector(
     (state) => state.currentMember.member
   );
+
   const currentMemberId = currentCompanyMember?.memberId?.id;
 
-  // --- Build available modules and info map from currentMember.modules ---
-  const modulesList = currentMember?.modules ?? [];
-
-  // If no modules are available, show a message
-  if (!modulesList.length) {
-    return (
-      <Dialog open={true} onOpenChange={onCancel}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>No Modules Available</DialogTitle>
-            <DialogDescription>
-              You don&apos;t have any modules assigned. You cannot assign
-              permissions to other members.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end">
-            <Button onClick={onCancel}>Close</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  // --- Build available modules from currentMember.modules ---
+  const availableModules = currentMember?.modules ?? [];
 
   // --- Debounce search term ---
   useEffect(() => {
@@ -227,8 +204,8 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
       memberId: "",
       role: CompanyMemberRole.EMPLOYEE,
       status: MemberStatus.PENDING,
-      modules: modulesList.map((mod) => ({
-        ...mod, // mod.moduleId is an object → matches schema now
+      modules: availableModules.map((mod) => ({
+        ...mod,
         isActive: false,
         permissions: [],
       })),
@@ -249,30 +226,42 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
   const watchedModules = useWatch({ control, name: "modules" });
   const watchedWebsiteIds = useWatch({ control, name: "websiteIds" });
 
-  // --- DEBUG: log validation state & errors ---
-  useEffect(() => {
-    console.log("🔍 Form is valid:", isValid);
-    if (!isValid) {
-      console.log("❌ Form errors:", errors);
-    }
-  }, [isValid, errors]);
-
   // --- Load edit data ---
   useEffect(() => {
     if (selectedData && isEditMode) {
       setSelectedMember(selectedData.memberId || null);
 
-      // Merge existing modules with modulesList to preserve full list
+      // Build a map of existing module assignments from selectedData
+      const existingModulesMap = new Map();
+      if (selectedData.modules && Array.isArray(selectedData.modules)) {
+        selectedData.modules.forEach((m: any) => {
+          existingModulesMap.set(m.moduleId.id, {
+            isActive: m.isActive,
+            permissions: m.permissions,
+          });
+        });
+      }
+
+      // Merge with availableModules (full list from current user)
+      const modulesToSet = availableModules.map((mod) => {
+        const existing = existingModulesMap.get(mod.moduleId.id);
+        return {
+          ...mod,
+          isActive: existing ? existing.isActive : false,
+          permissions: existing ? existing.permissions : [],
+        };
+      });
+
       reset({
         memberId: selectedData.memberId?.id || selectedData.memberId || "",
         role: selectedData.role || CompanyMemberRole.EMPLOYEE,
         status: selectedData.status || MemberStatus.PENDING,
-        modules: modulesList, // modulesList already has correct shape
+        modules: modulesToSet,
         websiteIds:
           selectedData.websites?.map((w: any) => w.id || w._id || w) || [],
       });
     }
-  }, [selectedData, isEditMode, reset, modulesList]);
+  }, [selectedData, isEditMode, reset, availableModules]);
 
   // --- Permission checks ---
   const canAssignRole = (role: CompanyMemberRole) => {
@@ -367,16 +356,15 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
 
   // --- Form submission ---
   const onSubmit = async (data: FormValues) => {
-    console.log("✅ Submit called with data:", data);
     try {
       const modulesToSend = data.modules.map((m) => ({
-        moduleId: m.moduleId.id, // extract the string ID for the server
+        moduleId: m.moduleId.id,
         isActive: m.isActive,
         permissions: m.permissions,
       }));
 
       const input = {
-        id: selectedData.id,
+        ...(selectedData?.id && { id: selectedData.id }),
         memberId: data.memberId,
         companyId: currentCompanyId,
         teamId: currentTeamId || undefined,
@@ -385,8 +373,6 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
         modules: modulesToSend,
         websites: data.websiteIds,
       };
-
-      console.log("🚀 Mutation input:", input);
 
       let response;
       if (isEditMode && selectedData?.id) {
@@ -398,8 +384,6 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
           variables: { input },
         });
       }
-
-      console.log("📨 Response:", response);
 
       if (
         response.data?.createCompanyMember ||
@@ -417,7 +401,6 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
         toast.error("Operation failed", { position: "top-center" });
       }
     } catch (error: any) {
-      console.error("🔥 Submission error:", error);
       toast.error(error.message || "An error occurred", {
         position: "top-center",
       });
@@ -433,6 +416,26 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
     (sum, m) => sum + m.permissions.length,
     0
   );
+
+  // --- If no modules available from current user, show fallback ---
+  if (!availableModules.length) {
+    return (
+      <Dialog open={true} onOpenChange={onCancel}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>No Modules Available</DialogTitle>
+            <DialogDescription>
+              You don&apos;t have any modules assigned. You cannot assign
+              permissions to other members.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button onClick={onCancel}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   // ===================== Render =====================
   return (
@@ -825,8 +828,8 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
               </TabsContent>
 
               {/* ----- Modules Tab ----- */}
-              <TabsContent value="modules" className="mt-0  overflow-auto! h-92">
-                <Card className="">
+              <TabsContent value="modules" className="mt-0 overflow-auto! h-92">
+                <Card>
                   <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div>
@@ -871,11 +874,10 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                       return (
                         <div
                           key={module.moduleId.id}
-                          className={`rounded-lg border transition-all ${
-                            module.isActive
+                          className={`rounded-lg border transition-all ${module.isActive
                               ? "border-primary/20 bg-primary/5"
                               : "border-border bg-card"
-                          }`}
+                            }`}
                         >
                           <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -887,19 +889,17 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                                 disabled={isSubmitting}
                               />
                               <div
-                                className={`p-2 rounded-lg ${
-                                  module.isActive
+                                className={`p-2 rounded-lg ${module.isActive
                                     ? "bg-primary/10"
                                     : "bg-muted"
-                                }`}
+                                  }`}
                               >
                                 <DynamicIcon
                                   name={iconName}
-                                  className={`h-5 w-5 ${
-                                    module.isActive
+                                  className={`h-5 w-5 ${module.isActive
                                       ? "text-primary"
                                       : "text-muted-foreground"
-                                  }`}
+                                    }`}
                                 />
                               </div>
                               <div className="min-w-0">
@@ -974,11 +974,10 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                                     return (
                                       <label
                                         key={permission.value}
-                                        className={`flex items-center p-2 rounded-md border cursor-pointer transition-all ${
-                                          isChecked
+                                        className={`flex items-center p-2 rounded-md border cursor-pointer transition-all ${isChecked
                                             ? "border-primary bg-primary/10"
                                             : "border-border hover:bg-muted/50"
-                                        }`}
+                                          }`}
                                       >
                                         <Checkbox
                                           checked={isChecked}
@@ -1122,30 +1121,26 @@ const AddCompanyMember: React.FC<AddCompanyMemberProps> = ({
                               onClick={() =>
                                 handleWebsiteToggle(website.id)
                               }
-                              className={`p-4 border rounded-lg flex items-start space-x-3 transition-all duration-200 ${
-                                isSelected
+                              className={`p-4 border rounded-lg flex items-start space-x-3 transition-all duration-200 ${isSelected
                                   ? "border-2 border-primary bg-primary/5 shadow-sm"
                                   : "border-border hover:border-primary/50 hover:bg-muted/30"
-                              }`}
+                                }`}
                             >
                               <div
-                                className={`p-2 rounded-lg transition-colors ${
-                                  isSelected ? "bg-primary/10" : "bg-muted"
-                                }`}
+                                className={`p-2 rounded-lg transition-colors ${isSelected ? "bg-primary/10" : "bg-muted"
+                                  }`}
                               >
                                 <BiGlobe
-                                  className={`h-5 w-5 transition-colors ${
-                                    isSelected
+                                  className={`h-5 w-5 transition-colors ${isSelected
                                       ? "text-primary"
                                       : "text-muted-foreground"
-                                  }`}
+                                    }`}
                                 />
                               </div>
                               <div className="flex-1 text-left">
                                 <p
-                                  className={`font-medium ${
-                                    isSelected ? "text-primary" : ""
-                                  }`}
+                                  className={`font-medium ${isSelected ? "text-primary" : ""
+                                    }`}
                                 >
                                   {website.name}
                                 </p>

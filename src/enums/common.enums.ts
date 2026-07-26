@@ -1,7 +1,6 @@
 
 
 export enum CompanyMemberRole {
-    SUPER_ADMIN = 'SUPER_ADMIN',
     OWNER = 'OWNER',
     MANAGER = 'MANAGER',
     EMPLOYEE = 'EMPLOYEE',

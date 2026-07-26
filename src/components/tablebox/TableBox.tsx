@@ -158,11 +158,11 @@ const TableBox = ({
   if (loading) return <TableSkeleton />;
 
   return (
-    <div className="flex flex-col h-fit bg-background text-foreground">
+    <div className="flex flex-col h-fit bg-background rounded-2xl text-foreground">
       {/* Selected Items Bar */}
       {selectedIds.length > 0 && (
-        <div className="px-4 py-3 bg-primary/5 border-b border-primary/10 rounded-t-lg">
-          <div className="flex items-center justify-between">
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-black p-4 rounded-3xl">
+          <div className="flex items-center justify-between text-white space-x-4">
             <span className="text-sm font-medium">
               {selectedIds.length} item{selectedIds.length > 1 ? "s" : ""} selected
             </span>
@@ -170,7 +170,7 @@ const TableBox = ({
               onClick={handleDeleteSelected}
               variant="destructive"
               size="sm"
-              className="gap-2"
+              className="gap-2 bg-red-800 text-white hover:bg-red-500"
             >
               <Trash2 className="h-4 w-4" />
               Delete Selected
@@ -181,10 +181,10 @@ const TableBox = ({
 
       <div className="flex-1 overflow-hidden rounded-lg border border-border">
           <Table className="w-full " tableHeight={height}>
-            <TableHeader className="sticky top-0 z-20 bg-background backdrop-blur-sm">
+            <TableHeader className="sticky top-0 z-20 bg-white backdrop-blur-sm">
               <TableRow className="hover:bg-transparent">
                 {checkbox && (
-                  <TableHead className="sticky left-0 z-30 bg-background backdrop-blur-sm min-w-9">
+                  <TableHead className="sticky left-0 z-30  backdrop-blur-sm min-w-9">
                     <Checkbox
                       checked={
                         selectedIds.length > 0 &&
@@ -208,7 +208,7 @@ const TableBox = ({
                   >
                     <div className="flex items-center gap-2 capitalize">
                       <span>{col.replace(/([A-Z])/g, " $1").trim()}</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 ))}
@@ -224,7 +224,7 @@ const TableBox = ({
                   >
                     <div className="flex items-center gap-2">
                       <span>Industry</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 )}
@@ -236,7 +236,7 @@ const TableBox = ({
                   >
                     <div className="flex items-center gap-2">
                       <span>Material</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 )}
@@ -248,7 +248,7 @@ const TableBox = ({
                   >
                     <div className="flex items-center gap-2">
                       <span>Style</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 )}
@@ -262,7 +262,7 @@ const TableBox = ({
                   >
                     <div className="flex items-center gap-2">
                       <span>Verified</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 )}
@@ -274,7 +274,7 @@ const TableBox = ({
                   >
                     <div className="flex items-center gap-2">
                       <span>Created By</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 )}
@@ -286,37 +286,37 @@ const TableBox = ({
                   >
                     <div className="flex items-center gap-2">
                       <span>Author</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 )}
 
                 {updatedAt && (
                   <TableHead
-                    className="cursor-pointer hover:bg-muted/80 transition-colors"
+                    className="cursor-pointer transition-colors"
                     onClick={() => handleSort("updatedAt")}
                   >
                     <div className="flex items-center gap-2">
                       <span>Updated At</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 )}
 
                 {createdAt && (
                   <TableHead
-                    className="cursor-pointer hover:bg-muted/80 transition-colors"
+                    className="cursor-pointer transition-colors"
                     onClick={() => handleSort("createdAt")}
                   >
                     <div className="flex items-center gap-2">
                       <span>Created At</span>
-                      <RxCaretSort className="size-5" />
+                      <RxCaretSort className="size-4" />
                     </div>
                   </TableHead>
                 )}
 
                 {action && (
-                  <TableHead className="sticky right-0 z-30 bg-background backdrop-blur-sm text-center">
+                  <TableHead className="sticky right-0 z-30 backdrop-blur-sm text-center">
                     Actions
                   </TableHead>
                 )}

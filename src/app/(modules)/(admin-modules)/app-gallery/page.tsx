@@ -5,7 +5,6 @@ import { ChangeEvent, useState, useCallback, useEffect } from "react";
 import axios from "axios";
 import Image from "next/image";
 import { FiUpload, FiImage, FiTrash2 } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
 import Container from "@/components/Container";
 
 // shadcn/ui components
@@ -14,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -31,8 +29,6 @@ const FOLDER = "dbManagementDashboard";
 const Page = () => {
   const [activeTab, setActiveTab] = useState<"gallery" | "upload">("gallery");
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [images, setImages] = useState<CloudinaryImage[]>([]);
   const [selectedImages, setSelectedImages] = useState<CloudinaryImage[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -58,7 +54,7 @@ const Page = () => {
       setNextCursor(response.data.next_cursor || null);
     } catch (err) {
       console.error(err);
-      setError("Failed to fetch images.");
+      toast.error("Failed to fetch images.");
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -85,8 +81,6 @@ const Page = () => {
     if (!files || files.length === 0) return;
 
     setUploading(true);
-    setError(null);
-    setSuccess(null);
     setUploadProgress(0);
 
     try {
@@ -98,9 +92,12 @@ const Page = () => {
       });
 
       if (validFiles.length !== fileArray.length) {
-        setError("Some files skipped (only JPEG/PNG/WebP/SVG under 10MB allowed)");
+        toast.warning("Some files skipped (only JPEG/PNG/WebP/SVG under 10MB allowed)");
       }
-      if (validFiles.length === 0) return;
+      if (validFiles.length === 0) {
+        setUploading(false);
+        return;
+      }
 
       const uploadedImages: CloudinaryImage[] = [];
 
@@ -142,13 +139,11 @@ const Page = () => {
       }
 
       setImages((prev) => [...uploadedImages, ...prev]);
-      toast.success(`${uploadedImages.length} images uploaded successfully!`, { position: "top-center" })
-      // setSuccess(`${uploadedImages.length} images uploaded successfully!`);
-      setTimeout(() => setSuccess(null), 3000);
+      toast.success(`${uploadedImages.length} image(s) uploaded successfully!`);
       setActiveTab("gallery");
     } catch (err) {
       console.error(err);
-      setError("Upload failed. Try again.");
+      toast.error("Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -179,51 +174,18 @@ const Page = () => {
 
       setImages((prev) => prev.filter((img) => !public_ids.includes(img.public_id)));
       setSelectedImages([]);
-      setSuccess(`${public_ids.length} images deleted successfully!`);
-      setTimeout(() => setSuccess(null), 3000);
+      toast.success(`${public_ids.length} image(s) deleted successfully!`);
     } catch (err) {
       console.error(err);
-      setError("Delete failed.");
+      toast.error("Delete failed. Please try again.");
     } finally {
       setUploading(false);
     }
   }, [selectedImages]);
 
   return (
-    <Container className="overflow-hidden px-4 py-0.5 h-full">
-      <Card className="w-full h-[calc(100dvh-80px)] relative overflow-hidden border-border shadow-sm">
-        {/* Status Messages */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute z-50 top-16 left-0 right-0 flex justify-center px-4"
-            >
-              <Alert variant="destructive" className="max-w-md shadow-lg">
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute z-50 top-16 left-0 right-0 flex justify-center px-4"
-            >
-              <Alert className="max-w-md shadow-lg border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-900">
-                <AlertTitle className="text-green-800 dark:text-green-300">Success</AlertTitle>
-                <AlertDescription className="text-green-700 dark:text-green-400">
-                  {success}
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+    <Container className="overflow-hidden px-4 py-0.5 h-full bg-gray-100">
+      <Card className="w-full h-[calc(100dvh-80px)]  relative overflow-hidden">
         {/* Tabs */}
         <Tabs
           value={activeTab}
@@ -231,7 +193,6 @@ const Page = () => {
           className="h-full flex flex-col"
         >
           <div className="flex items-center justify-between border-b border-border px-4">
-
             <TabsList className="grid grid-cols-2 pb-10! mb-4 bg-muted">
               <TabsTrigger value="upload" className="flex items-center py-2! px-4! gap-2">
                 <FiUpload className="mr-2 h-4 w-4" />
@@ -262,7 +223,7 @@ const Page = () => {
             <ScrollArea className="h-full pr-4" onScrollCapture={handleScroll}>
               {loading && images.length === 0 ? (
                 <div className="flex justify-center items-center w-full h-full">
-                  <LoaderCircle className={`animate-spin`} />
+                  <LoaderCircle className="animate-spin" />
                 </div>
               ) : images.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
@@ -279,12 +240,12 @@ const Page = () => {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 p-1">
                   {images.map((img, index) => (
-                    <Card
+                    <div
                       key={`${img.public_id}-${index}`}
                       className={cn(
-                        "relative overflow-hidden group cursor-pointer transition-all hover:shadow-md",
+                        "relative overflow-hidden  rounded-xl group cursor-pointer transition-all hover:shadow-md",
                         selectedImages.some((s) => s.secure_url === img.secure_url) &&
-                        "ring-2 ring-blue-600"
+                        "ring-2 ring-primary"
                       )}
                       onClick={() => handleImageSelect(img)}
                     >
@@ -294,28 +255,28 @@ const Page = () => {
                             src={img.secure_url}
                             alt={img.original_filename || "gallery image"}
                             fill
-                            className="object-cover"
-                            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
+                            className="object-cover w-44 h-44"
+                            // sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
                           />
                           <div className="absolute top-2 left-2">
                             <Checkbox
                               checked={selectedImages.some(
                                 (s) => s.secure_url === img.secure_url
                               )}
-                              onCheckedChange={() => { }}
-                              className="bg-background/80 backdrop-blur-sm "
+                              onCheckedChange={() => {}}
+                              className="bg-background/80 backdrop-blur-sm"
                             />
                           </div>
                         </div>
                       </CardContent>
-                    </Card>
+                    </div>
                   ))}
                 </div>
               )}
 
               {loadingMore && (
                 <div className="flex justify-center py-4">
-                  <LoaderCircle className={`animate-spin`} />
+                  <LoaderCircle className="animate-spin" />
                 </div>
               )}
             </ScrollArea>
@@ -369,7 +330,7 @@ const Page = () => {
                 >
                   {uploading ? (
                     <>
-                      <LoaderCircle className={`animate-spin`} />
+                      <LoaderCircle className="animate-spin" />
                       Uploading...
                     </>
                   ) : (
