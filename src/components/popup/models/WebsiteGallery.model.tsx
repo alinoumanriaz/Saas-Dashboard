@@ -44,6 +44,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAppSelector } from "@/redux/hooks";
 
 // ===================== Types =====================
 export interface IImageData {
@@ -63,16 +64,34 @@ interface WebsiteGalleryModelProps {
   mode?: "single" | "multiple";
 }
 
-const FOLDER = "dbManagementDashboard";
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
 // ===================== Component =====================
 const WebsiteGalleryModel = ({
   onCancel,
   onSentSelected,
   mode = "multiple",
 }: WebsiteGalleryModelProps) => {
+  // ------------------------------------------------------------
+  // Read Cloudinary config from Redux
+  // ------------------------------------------------------------
+  const cloudinaryConfig = useAppSelector(
+    (state) => state.companyCurrentWebsite.companyWebsite?.cloudinary
+  );
+  const {
+    folderName = "dbManagementDashboard",   // fallback
+    cloudinaryName = "dj5dbawzz",           // fallback
+    cloudinaryNameApiKey,
+    cloudinaryNameApiSecret,
+  } = cloudinaryConfig || {};
+
+  // These will be used throughout the component
+  const FOLDER = folderName;
+  const CLOUD_NAME = cloudinaryName;
+  const CLOUDINARY_API_KEY = cloudinaryNameApiKey;
+  const CLOUDINARY_API_SECRET = cloudinaryNameApiSecret;
+
+  // ------------------------------------------------------------
+  // State
+  // ------------------------------------------------------------
   const [activeTab, setActiveTab] = useState<"gallery" | "upload">("gallery");
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<CloudinaryImage[]>([]);
@@ -96,37 +115,50 @@ const WebsiteGalleryModel = ({
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState<number>(0);
   const [loadedThumbs, setLoadedThumbs] = useState<Set<string>>(new Set());
 
-  // Fetch images
-  const fetchImages = useCallback(async (cursor: string | null = null) => {
-    try {
-      if (!cursor) {
-        setLoading(true);
-        setFetchError(null);
+  // ------------------------------------------------------------
+  // Fetch images (uses dynamic folder & cloud name)
+  // ------------------------------------------------------------
+  const fetchImages = useCallback(
+    async (cursor: string | null = null) => {
+      try {
+        if (!cursor) {
+          setLoading(true);
+          setFetchError(null);
+        }
+
+        const params: Record<string, unknown> = {
+          folder: FOLDER,
+          cloudName: CLOUD_NAME,
+          cloudinaryApiKey: CLOUDINARY_API_KEY,
+          cloudinaryApiKeySecret: CLOUDINARY_API_SECRET,
+          limit: 50,
+        };
+        if (cursor) params.next_cursor = cursor;
+
+        const response = await axios.get("/api/cloudinary", { params });
+
+        setImages((prev) =>
+          cursor
+            ? [...prev, ...(response.data.images || [])]
+            : response.data.images || []
+        );
+        setNextCursor(response.data.next_cursor || null);
+      } catch (err) {
+        console.error(err);
+        if (!cursor) {
+          setFetchError(
+            "We couldn't load your images. Check your connection and try again."
+          );
+        } else {
+          toast.error("Failed to load more images.");
+        }
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
       }
-
-      const params: Record<string, unknown> = { folder: FOLDER, limit: 50 };
-      if (cursor) params.next_cursor = cursor;
-
-      const response = await axios.get("/api/cloudinary", { params });
-
-      setImages((prev) =>
-        cursor
-          ? [...prev, ...(response.data.images || [])]
-          : response.data.images || []
-      );
-      setNextCursor(response.data.next_cursor || null);
-    } catch (err) {
-      console.error(err);
-      if (!cursor) {
-        setFetchError("We couldn't load your images. Check your connection and try again.");
-      } else {
-        toast.error("Failed to load more images.");
-      }
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, []);
+    },
+    [FOLDER, CLOUD_NAME]
+  );
 
   useEffect(() => {
     if (activeTab === "gallery" && !hasFetchedGallery) {
@@ -147,13 +179,16 @@ const WebsiteGalleryModel = ({
     }
   };
 
-  // Upload files
+  // ------------------------------------------------------------
+  // Upload files (uses dynamic cloud name)
+  // ------------------------------------------------------------
   const handleFileUpload = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
 
     const fileArray = Array.from(files);
     const validFiles = fileArray.filter(
-      (file) => ACCEPTED_TYPES.includes(file.type) && file.size <= MAX_FILE_SIZE
+      (file) =>
+        ACCEPTED_TYPES.includes(file.type) && file.size <= MAX_FILE_SIZE
     );
 
     const skipped = fileArray.length - validFiles.length;
@@ -174,7 +209,7 @@ const WebsiteGalleryModel = ({
         const file = validFiles[i];
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("upload_preset", "dbManagementDashboard");
+        formData.append("upload_preset", FOLDER); // keep your preset
         formData.append("folder", FOLDER);
 
         const baseName = file.name
@@ -189,7 +224,7 @@ const WebsiteGalleryModel = ({
         formData.append("public_id", uniqueFileName);
 
         const response = await axios.post(
-          "https://api.cloudinary.com/v1_1/dj5dbawzz/image/upload",
+          `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
           formData,
           {
             withCredentials: false,
@@ -229,11 +264,15 @@ const WebsiteGalleryModel = ({
     e.target.value = "";
   };
 
-  // Handle image selection
+  // ------------------------------------------------------------
+  // Selection, deletion, alt text, preview navigation
+  // ------------------------------------------------------------
   const handleImageSelect = (image: CloudinaryImage) => {
     if (mode === "single") {
       setSelectedImages((prev) =>
-        prev.length > 0 && prev[0].secure_url === image.secure_url ? [] : [image]
+        prev.length > 0 && prev[0].secure_url === image.secure_url
+          ? []
+          : [image]
       );
       setCurrentPreviewIndex(0);
       return;
@@ -249,7 +288,6 @@ const WebsiteGalleryModel = ({
     });
   };
 
-  // Confirm and send with alt texts
   const handleConfirmSelection = () => {
     if (selectedImages.length === 0) {
       toast.error("Please select at least one image");
@@ -265,7 +303,6 @@ const WebsiteGalleryModel = ({
     onCancel();
   };
 
-  // Delete selected images
   const handleImageDelete = useCallback(async () => {
     if (selectedImages.length === 0) return;
 
@@ -275,10 +312,17 @@ const WebsiteGalleryModel = ({
     try {
       setUploading(true);
       await axios.delete("/api/cloudinary", {
-        data: { public_ids, folder: FOLDER },
+        data: {
+          public_ids,
+          folder: FOLDER,
+          cloudName: CLOUD_NAME,
+          // (do NOT send apiKey/apiSecret from client – handled server-side)
+        },
       });
 
-      setImages((prev) => prev.filter((img) => !public_ids.includes(img.public_id)));
+      setImages((prev) =>
+        prev.filter((img) => !public_ids.includes(img.public_id))
+      );
       setSelectedImages([]);
       toast.success(
         `${public_ids.length} image${public_ids.length > 1 ? "s" : ""} deleted successfully!`
@@ -289,7 +333,7 @@ const WebsiteGalleryModel = ({
     } finally {
       setUploading(false);
     }
-  }, [selectedImages]);
+  }, [selectedImages, FOLDER, CLOUD_NAME]);
 
   const handleAltTextChange = (publicId: string, text: string) => {
     setAltTexts((prev) => ({ ...prev, [publicId]: text }));
@@ -297,9 +341,13 @@ const WebsiteGalleryModel = ({
 
   const navigatePreview = (direction: "prev" | "next") => {
     if (direction === "prev") {
-      setCurrentPreviewIndex((prev) => (prev > 0 ? prev - 1 : selectedImages.length - 1));
+      setCurrentPreviewIndex((prev) =>
+        prev > 0 ? prev - 1 : selectedImages.length - 1
+      );
     } else {
-      setCurrentPreviewIndex((prev) => (prev < selectedImages.length - 1 ? prev + 1 : 0));
+      setCurrentPreviewIndex((prev) =>
+        prev < selectedImages.length - 1 ? prev + 1 : 0
+      );
     }
   };
 
@@ -312,11 +360,15 @@ const WebsiteGalleryModel = ({
     });
   };
 
+  // ------------------------------------------------------------
   // Derived data
+  // ------------------------------------------------------------
   const filteredImages = useMemo(() => {
     if (!searchQuery.trim()) return images;
     const q = searchQuery.trim().toLowerCase();
-    return images.filter((img) => img.original_filename?.toLowerCase().includes(q));
+    return images.filter((img) =>
+      img.original_filename?.toLowerCase().includes(q)
+    );
   }, [images, searchQuery]);
 
   const allFilteredSelected =
@@ -328,19 +380,28 @@ const WebsiteGalleryModel = ({
   const toggleSelectAll = () => {
     if (allFilteredSelected) {
       const filteredUrls = new Set(filteredImages.map((i) => i.secure_url));
-      setSelectedImages((prev) => prev.filter((img) => !filteredUrls.has(img.secure_url)));
+      setSelectedImages((prev) =>
+        prev.filter((img) => !filteredUrls.has(img.secure_url))
+      );
     } else {
       setSelectedImages((prev) => {
         const existingUrls = new Set(prev.map((i) => i.secure_url));
-        const toAdd = filteredImages.filter((img) => !existingUrls.has(img.secure_url));
+        const toAdd = filteredImages.filter(
+          (img) => !existingUrls.has(img.secure_url)
+        );
         return [...prev, ...toAdd];
       });
     }
   };
 
   const currentPreviewImage = selectedImages[currentPreviewIndex];
-  const currentAltText = currentPreviewImage ? altTexts[currentPreviewImage.public_id] || "" : "";
+  const currentAltText = currentPreviewImage
+    ? altTexts[currentPreviewImage.public_id] || ""
+    : "";
 
+  // ------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------
   return (
     <Dialog open={true} onOpenChange={() => onCancel()}>
       <DialogContent className="w-[95vw] min-w-6xl! max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0">
@@ -349,6 +410,11 @@ const WebsiteGalleryModel = ({
           <DialogDescription>
             {mode === "single" ? "Select a single image" : "Select one or more images"}
           </DialogDescription>
+          {/* Display current Cloudinary config */}
+          <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+            <span>☁️ {CLOUD_NAME}</span>
+            <span>📁 {FOLDER}</span>
+          </div>
         </DialogHeader>
 
         <Tabs
@@ -356,29 +422,21 @@ const WebsiteGalleryModel = ({
           onValueChange={(val) => setActiveTab(val as "gallery" | "upload")}
           className="flex-1 flex flex-col overflow-hidden min-h-0"
         >
-
           <div className="px-4 sm:px-6 pt-3">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-border">
-
               <TabsList className="grid w-full max-w-xs grid-cols-2">
-              <TabsTrigger value="upload" className="gap-2">
-                <FiUpload className="h-4 w-4" />
-                Upload
-              </TabsTrigger>
-              <TabsTrigger value="gallery" className="gap-2">
-                <FiImage className="h-4 w-4" />
-                Gallery
-              </TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="upload" className="gap-2">
+                  <FiUpload className="h-4 w-4" />
+                  Upload
+                </TabsTrigger>
+                <TabsTrigger value="gallery" className="gap-2">
+                  <FiImage className="h-4 w-4" />
+                  Gallery
+                </TabsTrigger>
+              </TabsList>
 
               <div className="flex items-center gap-2 ml-auto">
-                {/* {mode === "multiple" && filteredImages.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={toggleSelectAll}>
-                    {allFilteredSelected ? "Deselect all" : "Select all"}
-                  </Button>
-                )} */}
-
                 {selectedImages.length > 0 && (
                   <>
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -391,7 +449,10 @@ const WebsiteGalleryModel = ({
                     >
                       Clear
                     </Button>
-                    <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                    <AlertDialog
+                      open={deleteConfirmOpen}
+                      onOpenChange={setDeleteConfirmOpen}
+                    >
                       <AlertDialogTrigger asChild>
                         <Button
                           variant="destructive"
@@ -430,7 +491,6 @@ const WebsiteGalleryModel = ({
                 )}
               </div>
             </div>
-            
           </div>
 
           {/* Gallery Tab */}
@@ -438,9 +498,6 @@ const WebsiteGalleryModel = ({
             value="gallery"
             className="flex-1 mt-3 overflow-hidden flex flex-col min-h-0"
           >
-            
-
-            {/* Split view: grid + preview */}
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
               {/* Grid */}
               <div
@@ -451,7 +508,10 @@ const WebsiteGalleryModel = ({
                     : "flex-1 w-full"
                 )}
               >
-                <ScrollArea className="h-full px-4 sm:px-6 py-4" onScrollCapture={handleScroll}>
+                <ScrollArea
+                  className="h-full px-4 sm:px-6 py-4"
+                  onScrollCapture={handleScroll}
+                >
                   {loading && images.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-3 w-full h-64 text-muted-foreground">
                       <LoaderCircle className="size-6 animate-spin" />
@@ -475,8 +535,14 @@ const WebsiteGalleryModel = ({
                       <FiImage className="size-10 mb-3 opacity-30" />
                       {searchQuery ? (
                         <>
-                          <p className="text-sm">No images match &quot;{searchQuery}&quot;</p>
-                          <Button variant="link" size="sm" onClick={() => setSearchQuery("")}>
+                          <p className="text-sm">
+                            No images match &quot;{searchQuery}&quot;
+                          </p>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => setSearchQuery("")}
+                          >
                             Clear search
                           </Button>
                         </>
@@ -507,8 +573,9 @@ const WebsiteGalleryModel = ({
                             role="button"
                             tabIndex={0}
                             aria-pressed={isSelected}
-                            aria-label={`${isSelected ? "Deselect" : "Select"} ${img.original_filename || "image"
-                              }`}
+                            aria-label={`${
+                              isSelected ? "Deselect" : "Select"
+                            } ${img.original_filename || "image"}`}
                             onClick={() => handleImageSelect(img)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
@@ -560,7 +627,9 @@ const WebsiteGalleryModel = ({
                                     : "border-white/80 bg-black/20 backdrop-blur-sm opacity-0 group-hover:opacity-100"
                                 )}
                               >
-                                {isSelected && <Check className="size-3" strokeWidth={3} />}
+                                {isSelected && (
+                                  <Check className="size-3" strokeWidth={3} />
+                                )}
                               </div>
 
                               {/* Alt text indicator */}
@@ -639,7 +708,9 @@ const WebsiteGalleryModel = ({
                             </div>
 
                             <div className="mb-4">
-                              <Label className="text-xs text-muted-foreground">Filename</Label>
+                              <Label className="text-xs text-muted-foreground">
+                                Filename
+                              </Label>
                               <p
                                 className="text-sm truncate font-medium"
                                 title={currentPreviewImage.original_filename}
@@ -660,7 +731,10 @@ const WebsiteGalleryModel = ({
                                 type="text"
                                 value={currentAltText}
                                 onChange={(e) =>
-                                  handleAltTextChange(currentPreviewImage.public_id, e.target.value)
+                                  handleAltTextChange(
+                                    currentPreviewImage.public_id,
+                                    e.target.value
+                                  )
                                 }
                                 placeholder="Describe this image..."
                                 className="mt-1"
@@ -680,8 +754,12 @@ const WebsiteGalleryModel = ({
                                     <button
                                       key={img.public_id}
                                       type="button"
-                                      aria-label={`Preview ${img.original_filename || "image"}`}
-                                      onClick={() => setCurrentPreviewIndex(index)}
+                                      aria-label={`Preview ${
+                                        img.original_filename || "image"
+                                      }`}
+                                      onClick={() =>
+                                        setCurrentPreviewIndex(index)
+                                      }
                                       className={cn(
                                         "relative rounded-md overflow-hidden border-2 transition-colors",
                                         index === currentPreviewIndex
@@ -714,10 +792,21 @@ const WebsiteGalleryModel = ({
 
           {/* Upload Tab */}
           <TabsContent value="upload" className="flex-1 mt-3 p-4 sm:p-6 overflow-hidden">
+            {/* Show config info */}
+            <div className="text-sm text-muted-foreground mb-4 text-center">
+              <p>
+                Uploading to <span className="font-mono font-medium">{CLOUD_NAME}</span>
+                {' / '}
+                <span className="font-mono font-medium">{FOLDER}</span>
+              </p>
+            </div>
+
             <div
               className={cn(
                 "h-full flex items-center justify-center transition-colors rounded-lg border-2 border-dashed p-8",
-                isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                isDragging
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/40"
               )}
               onDragEnter={(e) => {
                 e.preventDefault();
@@ -808,3 +897,7 @@ const WebsiteGalleryModel = ({
 };
 
 export default WebsiteGalleryModel;
+
+// These constants remain unchanged
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+const MAX_FILE_SIZE = 10 * 1024 * 1024;

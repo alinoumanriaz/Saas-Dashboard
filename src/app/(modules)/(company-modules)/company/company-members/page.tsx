@@ -55,9 +55,9 @@ const CompanyMembersPage = () => {
 
   const canManageTeam = currentCompanyMember?.role
     ? [
-        CompanyMemberRole.OWNER,
-        CompanyMemberRole.MANAGER,
-      ].includes(currentCompanyMember.role as CompanyMemberRole)
+      CompanyMemberRole.OWNER,
+      CompanyMemberRole.MANAGER,
+    ].includes(currentCompanyMember.role as CompanyMemberRole)
     : false;
 
   const isOwner = currentCompanyMember?.role === CompanyMemberRole.OWNER;
@@ -104,7 +104,7 @@ const CompanyMembersPage = () => {
     }
   );
 
-  const showTableLoading = loading && networkStatus === 1;
+  const showTableLoading = (loading && networkStatus === 1) || !companyId;
 
   const [removeCompanyMembers] = useMutation<any>(REMOVE_COMPANY_MEMBERS);
 
@@ -114,12 +114,16 @@ const CompanyMembersPage = () => {
     data?.getPaginatedCompanyMembers?.totalCompanyMembersCount || 0;
   const totalPages = Math.ceil(totalMembers / ITEMS_PER_PAGE);
 
+  console.log("Raw Members Data:", rawMembers);
+
   const members = rawMembers.map((member) => ({
     ...member,
     email: member.memberId?.email || "",
     username: member.memberId?.username || "",
     avatar: member.memberId?.avatar || "",
     phone: member.memberId?.phone || "",
+    modules: member.modules || [],
+    websites: member.websites || [],
     websitesCount: member.websites?.length || 0,
   }));
 
@@ -360,6 +364,7 @@ const CompanyMembersPage = () => {
       activeFiltersCount={activeFiltersCount}
       onRefresh={() => refetch()}
       refreshing={showTableLoading}
+      networkStatus={networkStatus}
       onAdd={addHandler}
       addLabel="Add Company Member"
       addDisabled={!canManageTeam}

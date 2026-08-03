@@ -5,7 +5,10 @@ import cloudinary from "@/helpers/cloudinary";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const folder = searchParams.get("folder") || "uniquecustomboxesmedia";
+    const folder = searchParams.get("folder");
+    const cloudName = searchParams.get("cloudName") || process.env.CLOUDINARY_CLOUD_NAME;
+    const cloudinaryApiKey = searchParams.get("cloudinaryApiKey") || process.env.CLOUDINARY_API_KEY;
+    const cloudinaryApiKeySecret = searchParams.get("cloudinaryApiKeySecret") || process.env.CLOUDINARY_API_SECRET;
     if (!folder)
       return NextResponse.json(
         { error: "Folder name is required" },
@@ -13,7 +16,7 @@ export async function GET(req: Request) {
       );
 
     const response = await axios.get(
-      `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/resources/search`,
+      `https://api.cloudinary.com/v1_1/${cloudName}/resources/search`,
       {
         params: {
           expression: `folder:${folder}`,
@@ -21,8 +24,8 @@ export async function GET(req: Request) {
           next_cursor: searchParams.get("next_cursor") || undefined,
         },
         auth: {
-          username: process.env.CLOUDINARY_API_KEY || "",
-          password: process.env.CLOUDINARY_API_SECRET || "",
+          username: cloudinaryApiKey || "",
+          password: cloudinaryApiKeySecret || "",
         },
       }
     );

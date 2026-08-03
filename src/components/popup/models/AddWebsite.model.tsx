@@ -71,6 +71,7 @@ const websiteSchema = z.object({
       "Enter a valid domain (e.g., example.com)"
     ),
   status: z.nativeEnum(WebsiteStatus),
+  createdBy: z.string(),
   database: z.object({
     name: z.string().min(1, "Database name is required"),
     type: z.nativeEnum(DatabaseType),
@@ -122,6 +123,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
     (state) => state.currentCompanyMember.companyMember
   );
   const currentCompany = currentCompanyMember?.companyId;
+  const currentCompanyMemberId = currentCompanyMember?.id;
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
@@ -142,6 +144,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
         username: "",
         password: "",
       },
+      createdBy: currentCompanyMemberId || "",
       cloudinary: null,
     },
   });
@@ -163,6 +166,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
         name: selectedData.name || "",
         domain: selectedData.domain || "",
         status: selectedData.status || WebsiteStatus.ACTIVE,
+        createdBy: selectedData.createdBy || currentCompanyMemberId || "",
         database: selectedData.database || {
           name: "",
           type: DatabaseType.MONGODB,
@@ -179,7 +183,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
       // New: set company from currentCompany
       setValue("companyId", currentCompany?.id || "");
     }
-  }, [isEditMode, selectedData, currentCompany, reset, setValue]);
+  }, [isEditMode, selectedData, currentCompany, currentCompanyMemberId, reset, setValue]);
 
   // GraphQL mutations
   const [createWebsite] = useMutation<any>(CREATE_WEBSITE);
@@ -194,6 +198,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
         name: data.name.trim(),
         domain: data.domain.trim().toLowerCase(),
         status: data.status,
+        createdBy: data.createdBy,
         database: {
           name: data.database.name.trim(),
           type: data.database.type,

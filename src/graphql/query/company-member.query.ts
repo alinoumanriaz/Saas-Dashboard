@@ -38,6 +38,20 @@ export const GET_PAGINATED_COMPANY_MEMBERS = gql`
           domain
           status
           }
+        modules {
+          moduleId {
+            id
+            moduleName
+            moduleIcon
+            description
+            route
+            status
+            moduleType
+            order
+          }
+          isActive
+          permissions
+        }
         createdAt
         updatedAt
       }

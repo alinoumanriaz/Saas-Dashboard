@@ -16,7 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 // Custom components
 import { DynamicForm, TabConfig } from "@/components/DynamicFormPopup";
-import GalleryModel from "./GalleryModel";
+import WebsiteGalleryModel from "./WebsiteGallery.model";
 
 // Helpers & GraphQL
 import { generateSlug } from "@/helpers/slug-maker";
@@ -375,10 +375,10 @@ const MetaTab = ({
             </span>
             <span
               className={`text-sm ${(metaDescription?.length || 0) > 160
-                  ? "text-red-500"
-                  : (metaDescription?.length || 0) > 150
-                    ? "text-yellow-500"
-                    : "text-green-500"
+                ? "text-red-500"
+                : (metaDescription?.length || 0) > 150
+                  ? "text-yellow-500"
+                  : "text-green-500"
                 }`}
             >
               {metaDescription?.length || 0}/160
@@ -815,7 +815,7 @@ const AddIndustry = ({
     };
     const cleanInputData = removeTypename(inputData);
 
-    console.log({cleanInputData:cleanInputData})
+    console.log({ cleanInputData: cleanInputData })
 
     try {
       let result;
@@ -926,7 +926,7 @@ const AddIndustry = ({
       />
 
       {showGalleryOpen && (
-        <GalleryModel
+        <WebsiteGalleryModel
           onCancel={galleryCloseHandler}
           onSentSelected={handleSelectedImage}
           mode="single"

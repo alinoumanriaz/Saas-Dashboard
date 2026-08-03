@@ -35,6 +35,7 @@ export const GET_PAGINATED_WEBSITES = gql`
           cloudinaryNameApiKey
           cloudinaryNameApiKeySecret
         }
+        createdBy
         createdAt
         updatedAt
       }
