@@ -13,7 +13,7 @@ import { useAppSelector } from "@/redux/hooks";
 import { CREATE_BLOG, UPDATE_BLOG } from "@/graphql/query/blog.query";
 import { CHECK_SLUG_UNIQUE } from "@/graphql/query/blog.query"; // You'll need to create this query
 
-const ToastEditor = dynamic(() => import("@/components/RichTextEditor"), {
+const ToastEditor = dynamic(() => import("@/components/TiptopTextEditor"), {
   ssr: false,
 });
 

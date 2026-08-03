@@ -10,10 +10,18 @@ export interface DatabaseConfig {
   password: string;
 }
 
+export interface CloudinaryConfig {
+  folderName: string;
+  cloudinaryName: string;
+  cloudinaryNameApiKey: string;
+  cloudinaryNameApiSecret: string;
+}
+
 export interface Website {
   id: string;
   name: string;
   domain: string;
   status: WebsiteStatus;
   database: DatabaseConfig;
+  cloudinary: CloudinaryConfig;
 }

@@ -126,6 +126,12 @@ query GetCompaniesOfCurrentMemberById($id: String!) {
       name
       domain
       status
+      cloudinary {
+        folderName
+        cloudinaryName
+        cloudinaryNameApiKey
+        cloudinaryNameApiKeySecret
+        }
       }
       modules {
         moduleId {

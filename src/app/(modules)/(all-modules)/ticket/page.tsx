@@ -1,548 +1,371 @@
-// "use client";
+"use client";
+import { useEffect, useReducer, useState } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
+import {
+  DELETE_TICKETS,
+  GET_PAGINATED_TICKETS,
+} from "@/graphql/query/ticket.query";
+import {
+  filterReducer,
+  initialFilterState,
+} from "@/useReducerHooks/user-filter-reducer";
+import { useAppSelector } from "@/redux/hooks";
+import { PlatformRole, Task, TicketPriority, TicketStatus } from "@/enums/common.enums";
+import { DataListPage, FilterConfig, StatsCard } from "@/components/DataListPage";
+import ConfirmationBox from "@/components/popup/models/ConfirmationBox";
+// import AddTicketModal from "@/components/popup/models/AddTicket.model"; // you'll create this modal
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import {
+  BiSupport,
+  BiCheckCircle,
+  BiXCircle,
+  BiTime,
+  BiTask,
+} from "react-icons/bi";
+import { BsCalendar } from "react-icons/bs";
+import AddTicketModal from "@/components/popup/models/AddTicket.model";
 
-// import { useEffect, useReducer, useState } from "react";
-// import { useMutation, useQuery } from "@apollo/client/react";
-// import { useAppSelector } from "@/redux/hooks";
-// import { PlatformRole } from "@/enums/common.enums";
-// import {
-//   GET_PAGINATED_TICKETS,
-//   DELETE_TICKETS,
-// } from "@/graphql/query/ticket.query"; // you'll need to create these
-// import { filterReducer, initialFilterState } from "@/useReducerHooks/website-filter-reducer";
+const ITEMS_PER_PAGE = 10;
 
-// // shadcn/ui components
-// import { Button } from "@/components/ui/button";
-// import {
-//   Card,
-//   CardContent,
-//   CardDescription,
-//   CardHeader,
-//   CardTitle,
-// } from "@/components/ui/card";
-// import {
-//   Dialog,
-//   DialogContent,
-//   DialogDescription,
-//   DialogFooter,
-//   DialogHeader,
-//   DialogTitle,
-// } from "@/components/ui/dialog";
-// import { Input } from "@/components/ui/input";
-// import {
-//   Select,
-//   SelectContent,
-//   SelectItem,
-//   SelectTrigger,
-//   SelectValue,
-// } from "@/components/ui/select";
-// import { Badge } from "@/components/ui/badge";
-// import { FilterX, ListFilter, RefreshCw } from "lucide-react";
-// // Icons
-// import {
-//   BiSearch,
-//   BiShoppingBag,
-//   BiCheckCircle,
-//   BiXCircle,
-//   BiTime,
-//   BiUser,
-//   BiDollar,
-// } from "react-icons/bi";
-// import { BsCalendar } from "react-icons/bs";
+interface ITicket {
+  id: string;
+  ticketNumber: string;
+  subject: string;
+  description: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  task: Task;
+  createdAt: string;
+  updatedAt: string;
+  company?: { name: string }; // if populated
+  createdBy?: { username: string; avatar?: string };
+}
 
-// // Custom modals (placeholder)
-// // import AddOrderTicket from "@/components/popup/models/AddOrderTicket.model"; // you need to create this
-// import TableBox from "@/components/tablebox/TableBox";
-// import Container from "@/components/Container";
-// import { toast } from "sonner";
+const Page = () => {
+  const currentMember = useAppSelector((state) => state.currentMember.member);
+  const selectedCompanyMember = useAppSelector(
+    (state) => state.currentCompanyMember.companyMember
+  );
+  const companyId = selectedCompanyMember?.companyId?.id;
+  const currentCompany = selectedCompanyMember?.company;
+  const isSuperAdmin = currentMember?.role === PlatformRole.SUPER_ADMIN;
 
-// // Order status enum (adjust to your actual enum)
-// export enum OrderStatus {
-//   PENDING = "PENDING",
-//   PROCESSING = "PROCESSING",
-//   COMPLETED = "COMPLETED",
-//   CANCELLED = "CANCELLED",
-// }
+  const [state, dispatch] = useReducer(filterReducer, initialFilterState);
+  const { currentPage, status, searchText } = state;
 
-// const ITEMS_PER_PAGE = 10;
+  // Local filter states
+  const [localStatus, setLocalStatus] = useState<string>(status || "");
+  const [localSearch, setLocalSearch] = useState<string>(searchText || "");
+  const [showFilters, setShowFilters] = useState(false);
 
-// interface IOrder {
-//   id: string;
-//   orderNumber: string;
-//   customerName: string;
-//   customerEmail: string;
-//   totalAmount: number;
-//   status: OrderStatus;
-//   createdAt: string;
-//   updatedAt: string;
-//   // additional fields as needed
-// }
+  // Debounce filter changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const statusVal = localStatus === "" ? undefined : localStatus;
+      dispatch({ type: "SET_STATUS", payload: statusVal });
+      dispatch({ type: "SET_SEARCH", payload: localSearch || "" });
+      dispatch({ type: "SET_PAGE", payload: 1 });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localStatus, localSearch, dispatch]);
 
-// const AllOrderTicketPage = () => {
-//   const currentMember = useAppSelector((state) => state.currentMember.member);
-//   const selectedCompanyMember = useAppSelector(
-//     (state) => state.currentCompanyMember.companyMember
-//   );
-//   const companyId = selectedCompanyMember?.companyId?.id;
-//   const currentCompany = selectedCompanyMember?.company;
-//   const isSuperAdmin = currentMember?.role === PlatformRole.SUPER_ADMIN;
+  const [selectedData, setSelectedData] = useState<ITicket | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showConfirmationModel, setShowConfirmationModel] = useState(false);
+  const [showAddModel, setShowAddModel] = useState(false);
+  const [selectedIdsForDeletion, setSelectedIdsForDeletion] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-//   const [state, dispatch] = useReducer(filterReducer, initialFilterState);
-//   const { currentPage, status, searchText } = state;
+  const { data, loading, error, refetch, networkStatus } = useQuery<any>(
+    GET_PAGINATED_TICKETS,
+    {
+      variables: {
+        page: Number(currentPage) || 1,
+        limit: ITEMS_PER_PAGE,
+        status: status || null,
+        search: searchText || null,
+        companyId: companyId,
+      },
+      fetchPolicy: "network-only",
+      skip: !companyId,
+    }
+  );
 
-//   // Local filter state
-//   const [localStatus, setLocalStatus] = useState<string>(status || "all");
-//   const [localSearch, setLocalSearch] = useState<string>(searchText || "");
+  const showTableLoading = loading && networkStatus === 1;
 
-//   // Debounced filter updates
-//   useEffect(() => {
-//     const timer = setTimeout(() => {
-//       const statusVal = localStatus === "all" ? undefined : localStatus;
-//       dispatch({ type: "SET_STATUS", payload: statusVal });
-//       dispatch({ type: "SET_SEARCH", payload: localSearch || "" });
-//       dispatch({ type: "SET_PAGE", payload: 1 });
-//     }, 400);
-//     return () => clearTimeout(timer);
-//   }, [localStatus, localSearch, dispatch]);
+  const [deleteTickets] = useMutation<any>(DELETE_TICKETS);
 
-//   const [showFilters, setShowFilters] = useState(false);
+  const tickets: ITicket[] = data?.getPaginatedTickets?.tickets || [];
+  const totalTickets = data?.getPaginatedTickets?.totalTicketsCount || 0;
+  const totalPages = Math.ceil(totalTickets / ITEMS_PER_PAGE);
 
-//   // Selection & modals
-//   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-//   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-//   const [showAddEditDialog, setShowAddEditDialog] = useState(false);
-//   const [editingOrder, setEditingOrder] = useState<IOrder | null>(null);
-//   const [isDeleting, setIsDeleting] = useState(false);
+  // Derived stats
+  const openCount = tickets.filter((t) => t.status === TicketStatus.OPEN).length;
+  const inProgressCount = tickets.filter((t) => t.status === TicketStatus.IN_PROGRESS).length;
+  const waitingCount = tickets.filter((t) => t.status === TicketStatus.WAITING_CUSTOMER).length;
+  const resolvedCount = tickets.filter((t) => t.status === TicketStatus.RESOLVED).length;
+  const closedCount = tickets.filter((t) => t.status === TicketStatus.CLOSED).length;
 
-//   // Query
-//   const { data, loading, error, refetch, networkStatus } = useQuery<any>(
-//     GET_PAGINATED_TICKETS,
-//     {
-//       variables: {
-//         page: Number(currentPage) || 1,
-//         limit: ITEMS_PER_PAGE,
-//         status: status || null,
-//         search: searchText || null,
-//         companyId: companyId,
-//       },
-//       fetchPolicy: "network-only",
-//       skip: !companyId,
-//     }
-//   );
+  const stats: StatsCard[] = [
+    {
+      label: "Total Tickets",
+      value: totalTickets,
+      icon: <BiSupport />,
+    },
+    {
+      label: "Open",
+      value: openCount,
+      icon: <BiTime />,
+    },
+    {
+      label: "In Progress",
+      value: inProgressCount,
+      icon: <BiTask />,
+    },
+    {
+      label: "Resolved",
+      value: resolvedCount,
+      icon: <BiCheckCircle />,
+    },
+    {
+      label: "Closed",
+      value: closedCount,
+      icon: <BiXCircle />,
+    },
+  ];
 
-//   const showTableLoading = loading && networkStatus === 1;
+  // Filter configuration
+  const filterConfig: FilterConfig[] = [
+    {
+      key: "search",
+      type: "search",
+      placeholder: "Search by ticket number or subject...",
+      label: "Search",
+    },
+    {
+      key: "status",
+      type: "select",
+      placeholder: "All Status",
+      label: "Status",
+      options: [
+        { label: "Open", value: TicketStatus.OPEN },
+        { label: "In Progress", value: TicketStatus.IN_PROGRESS },
+        { label: "Waiting Customer", value: TicketStatus.WAITING_CUSTOMER },
+        { label: "Resolved", value: TicketStatus.RESOLVED },
+        { label: "Closed", value: TicketStatus.CLOSED },
+      ],
+    },
+  ];
 
-//   const [deleteTickets] = useMutation<any>(DELETE_TICKETS);
+  const filterValues = {
+    search: localSearch,
+    status: localStatus,
+  };
 
-//   const tickets: ITicket[] = data?.getPaginatedTickets?.tickets || [];
-//   const totalTickets = data?.getPaginatedTickets?.totalTicketsCount || 0;
-//   const totalPages = Math.ceil(totalTickets / ITEMS_PER_PAGE);
+  const activeFiltersCount = [status, searchText && searchText.length > 0].filter(Boolean).length;
 
-//   // Derived stats
-//   const pendingCount = tickets.filter((t) => t.status === TicketStatus.PENDING).length;
-//   const processingCount = tickets.filter((t) => t.status === TicketStatus.PROCESSING).length;
-//   const completedCount = tickets.filter((t) => t.status === TicketStatus.COMPLETED).length;
-//   const cancelledCount = tickets.filter((t) => t.status === TicketStatus.CANCELLED).length;
-//   const totalRevenue = tickets.reduce((sum, t) => sum + t.totalAmount, 0);
+  const handleResetFilters = () => {
+    setLocalSearch("");
+    setLocalStatus("all");
+    dispatch({ type: "RESET_FILTERS" });
+  };
 
-//   // ----- Handlers -----
-//   const handleResetFilters = () => {
-//     setLocalStatus("all");
-//     setLocalSearch("");
-//     dispatch({ type: "RESET_FILTERS" });
-//   };
+  // Handlers
+  const cancelDelete = () => {
+    setSelectedIdsForDeletion([]);
+    setShowConfirmationModel(false);
+  };
 
-//   const handleAdd = () => {
-//     setEditingOrder(null);
-//     setShowAddEditDialog(true);
-//   };
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    if (selectedIdsForDeletion.length === 0) return;
 
-//   const handleEdit = (order: IOrder) => {
-//     setEditingOrder(order);
-//     setShowAddEditDialog(true);
-//   };
+    try {
+      const { data } = await deleteTickets({
+        variables: { ids: selectedIdsForDeletion },
+      });
 
-//   const handleDelete = async () => {
-//     if (selectedIds.length === 0) return;
-//     setIsDeleting(true);
-//     try {
-//       const { data } = await deleteOrders({
-//         variables: { ids: selectedIds },
-//       });
-//       if (data?.deleteOrders?.success) {
-//         toast.success(data.deleteOrders.message, { position: "top-center" });
-//         setShowDeleteDialog(false);
-//         setSelectedIds([]);
-//         refetch();
-//       } else {
-//         toast.error(data?.deleteOrders?.message || "Failed to delete orders", {
-//           position: "top-center",
-//         });
-//       }
-//     } catch (err: any) {
-//       toast.error(err.message || "Failed to delete orders", { position: "top-center" });
-//     } finally {
-//       setIsDeleting(false);
-//     }
-//   };
+      if (data?.deleteTickets?.success) {
+        toast.success(data.deleteTickets.message, { position: "top-center" });
+        setShowConfirmationModel(false);
+        refetch();
+        setSelectedIdsForDeletion([]);
+      } else {
+        toast.error(data?.deleteTickets?.message || "Failed to delete tickets", {
+          position: "top-center",
+        });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete tickets", { position: "top-center" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-//   const deleteHandler = (ids: string[]) => {
-//     setSelectedIds(ids);
-//     setShowDeleteDialog(true);
-//   };
+  const deleteHandler = (ids: string[]) => {
+    setSelectedIdsForDeletion(ids);
+    setShowConfirmationModel(true);
+  };
 
-//   const editHandler = (order: any) => {
-//     handleEdit(order);
-//   };
+  const editHandler = (ticketData: ITicket) => {
+    setIsEditMode(true);
+    setSelectedData(ticketData);
+    setShowAddModel(true);
+  };
 
-//   // ----- TableBox columns and custom renderers -----
-//   const columns = ["orderNumber", "customer", "totalAmount", "status", "createdAt"];
+  const addHandler = () => {
+    setSelectedData(null);
+    setIsEditMode(false);
+    setShowAddModel(true);
+  };
 
-//   const customRenderers = {
-//     orderNumber: (value: string, row: IOrder) => (
-//       <div className="flex items-center gap-2">
-//         <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
-//           <BiShoppingBag className="h-4 w-4 text-muted-foreground" />
-//         </div>
-//         <div>
-//           <div className="font-medium">{row.orderNumber}</div>
-//           <div className="text-xs text-muted-foreground">ID: {row.id.slice(0, 8)}</div>
-//         </div>
-//       </div>
-//     ),
-//     customer: (value: any, row: IOrder) => (
-//       <div>
-//         <div className="font-medium">{row.customerName}</div>
-//         <div className="text-xs text-muted-foreground">{row.customerEmail}</div>
-//       </div>
-//     ),
-//     totalAmount: (value: number) => (
-//       <span className="font-mono text-sm font-semibold">
-//         ${value.toFixed(2)}
-//       </span>
-//     ),
-//     status: (value: OrderStatus) => {
-//       const statusMap: Record<OrderStatus, { label: string; variant: "default" | "destructive" | "outline" | "secondary" | "success" }> = {
-//         [OrderStatus.PENDING]: { label: "Pending", variant: "outline" },
-//         [OrderStatus.PROCESSING]: { label: "Processing", variant: "secondary" },
-//         [OrderStatus.COMPLETED]: { label: "Completed", variant: "success" },
-//         [OrderStatus.CANCELLED]: { label: "Cancelled", variant: "destructive" },
-//       };
-//       const info = statusMap[value] || { label: value, variant: "outline" };
-//       return (
-//         <Badge variant={info.variant} className="gap-1">
-//           {value === OrderStatus.PENDING && <BiTime size={14} />}
-//           {value === OrderStatus.COMPLETED && <BiCheckCircle size={14} />}
-//           {value === OrderStatus.CANCELLED && <BiXCircle size={14} />}
-//           {info.label}
-//         </Badge>
-//       );
-//     },
-//     createdAt: (value: string) => (
-//       <div className="flex items-center gap-1 text-sm">
-//         <BsCalendar className="h-3 w-3 text-muted-foreground" />
-//         {new Date(value).toLocaleDateString("en-US", {
-//           year: "numeric",
-//           month: "short",
-//           day: "numeric",
-//           hour: "2-digit",
-//           minute: "2-digit",
-//         })}
-//       </div>
-//     ),
-//   };
+  const cancelAddTicket = () => {
+    setShowAddModel(false);
+  };
 
-//   // Count active filters
-//   const activeFiltersCount = [status, searchText].filter(Boolean).length;
+  // Custom renderers for all columns
+  const columns = ["ticketNumber", "subject", "status", "priority", "task", "createdAt"];
 
-//   const canManage = true; // adjust based on permissions
+  const customRenderers = {
+    ticketNumber: (value: string, row: ITicket) => (
+      <div className="flex items-center gap-2">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
+          <BiSupport className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <div>
+          <div className="font-medium">{value}</div>
+          {row.company?.name && (
+            <div className="text-xs text-muted-foreground">{row.company.name}</div>
+          )}
+        </div>
+      </div>
+    ),
+    subject: (value: string) => (
+      <div className="max-w-[200px] truncate" title={value}>
+        {value}
+      </div>
+    ),
+    status: (value: TicketStatus) => {
+      const statusMap: Record<TicketStatus, { label: string; variant: any }> = {
+        [TicketStatus.OPEN]: { label: "Open", variant: "default" },
+        [TicketStatus.IN_PROGRESS]: { label: "In Progress", variant: "secondary" },
+        [TicketStatus.WAITING_CUSTOMER]: { label: "Waiting", variant: "outline" },
+        [TicketStatus.RESOLVED]: { label: "Resolved", variant: "success" },
+        [TicketStatus.CLOSED]: { label: "Closed", variant: "destructive" },
+      };
+      const info = statusMap[value] || { label: value, variant: "outline" };
+      return (
+        <Badge variant={info.variant} className="gap-1">
+          {value === TicketStatus.OPEN && <BiTime size={14} />}
+          {value === TicketStatus.IN_PROGRESS && <BiTask size={14} />}
+          {value === TicketStatus.RESOLVED && <BiCheckCircle size={14} />}
+          {value === TicketStatus.CLOSED && <BiXCircle size={14} />}
+          {info.label}
+        </Badge>
+      );
+    },
+    priority: (value: TicketPriority) => (
+      <Badge variant="outline" className="capitalize">
+        {value.toLowerCase()}
+      </Badge>
+    ),
+    task: (value: Task) => (
+      <span className="text-sm">{value.replace(/_/g, " ")}</span>
+    ),
+    createdAt: (value: string) => (
+      <div className="flex items-center gap-1 text-sm">
+        <BsCalendar className="h-3 w-3 text-muted-foreground" />
+        {new Date(value).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </div>
+    ),
+  };
 
-//   if (!isSuperAdmin && !companyId) {
-//     return (
-//       <Container className="overflow-y-auto h-full">
-//         <div className="flex items-center justify-center min-h-[60vh]">
-//           <Card className="w-full max-w-md">
-//             <CardHeader>
-//               <CardTitle className="text-center">No Company Selected</CardTitle>
-//               <CardDescription className="text-center">
-//                 Please select a company to view its orders.
-//               </CardDescription>
-//             </CardHeader>
-//             <CardContent className="flex justify-center">
-//               <BiShoppingBag className="h-16 w-16 text-muted-foreground" />
-//             </CardContent>
-//           </Card>
-//         </div>
-//       </Container>
-//     );
-//   }
+  // TableBox configuration
+  const tableBoxConfig = {
+    column: columns,
+    checkbox: true,
+    action: true,
+    deletehandler: deleteHandler,
+    edithandler: editHandler,
+    height: "max-h-[calc(100vh-320px)]",
+    createdAt: true,
+    updatedAt: true,
+    customRenderers,
+  };
 
-//   return (
-//     <Container className="overflow-y-auto h-full">
-//       <div className="w-full h-full text-[13px]">
-//         <div className="w-full h-full overflow-hidden px-4">
-//           {/* Header Section */}
-//           <div className="flex justify-between items-center pb-6">
-//             <CardHeader className="w-full p-0">
-//               <CardTitle className="text-xl">Order Management</CardTitle>
-//               <CardDescription>
-//                 <span>
-//                   {isSuperAdmin ? "All Companies" : currentCompany?.name || "N/A"}
-//                 </span>
-//                 <span className="ml-2 text-muted-foreground">
-//                   • {totalOrders} {totalOrders === 1 ? "order" : "orders"}
-//                 </span>
-//               </CardDescription>
-//             </CardHeader>
+  const canManage = true;
 
-//             <div className="flex items-center space-x-3">
-//               {/* Filter Toggle */}
-//               <Button
-//                 variant="outline"
-//                 onClick={() => setShowFilters(!showFilters)}
-//                 className="gap-2"
-//               >
-//                 <ListFilter className="size-4" />
-//                 {activeFiltersCount > 0 && (
-//                   <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-5">
-//                     {activeFiltersCount}
-//                   </span>
-//                 )}
-//               </Button>
+  return (
+    <DataListPage
+      title="Ticket Management"
+      subtitle={
+        <span>
+          {isSuperAdmin
+            ? "All Companies"
+            : currentCompany?.name || "No Company Selected"}{" "}
+          • {totalTickets} {totalTickets === 1 ? "ticket" : "tickets"}
+        </span>
+      }
+      stats={stats}
+      filterConfig={filterConfig}
+      filterValues={filterValues}
+      onFilterChange={(key, value) => {
+        if (key === "search") setLocalSearch(value || "");
+        else if (key === "status")
+          setLocalStatus(value === undefined ? "all" : value);
+      }}
+      onResetFilters={handleResetFilters}
+      showFilters={showFilters}
+      onToggleFilters={() => setShowFilters(!showFilters)}
+      activeFiltersCount={activeFiltersCount}
+      onRefresh={() => refetch()}
+      refreshing={showTableLoading}
+      onAdd={addHandler}
+      addLabel="Add Ticket"
+      addDisabled={!companyId && !isSuperAdmin} // disable if no company selected
+      data={tickets}
+      loading={showTableLoading}
+      currentPage={currentPage}
+      totalPages={totalPages}
+      setCurrentPage={(page) => dispatch({ type: "SET_PAGE", payload: page })}
+      tableBoxConfig={tableBoxConfig}
+      error={error}
+      onRetry={() => refetch()}
+      canManage={canManage}
+    >
+      {/* Confirmation Modal */}
+      {showConfirmationModel && (
+        <ConfirmationBox
+          onCancel={cancelDelete}
+          onDelete={confirmDelete}
+          title="Delete Tickets"
+          message={`Are you sure you want to delete ${selectedIdsForDeletion.length} ticket(s)? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          loading={isDeleting}
+        />
+      )}
 
-//               <Button
-//                 variant="outline"
-//                 onClick={() => refetch()}
-//                 disabled={loading}
-//                 className="gap-1"
-//               >
-//                 {loading ? (
-//                   <>
-//                     <RefreshCw className="size-4 animate-spin" />
-//                     <span>Refreshing...</span>
-//                   </>
-//                 ) : (
-//                   <>
-//                     <RefreshCw className="size-4" />
-//                     <span>Refresh</span>
-//                   </>
-//                 )}
-//               </Button>
+      {showAddModel && (
+        <AddTicketModal
+          onCancel={cancelAddTicket}
+          selectedData={selectedData}
+          isEditMode={isEditMode}
+          refetch={refetch}
+          currentMemberId={currentMember?.id}
+          companyId={companyId}
+        />
+        
+      )}
+    </DataListPage>
+  );
+};
 
-//               <Button onClick={handleAdd}>
-//                 Add Order
-//               </Button>
-//             </div>
-//           </div>
-
-//           {/* Filters */}
-//           {showFilters && (
-//             <Card className="animate-in bg-background slide-in-from-top-2 duration-200 ring-0">
-//               <div className="w-full">
-//                 <div className="w-full flex justify-start items-center gap-2">
-//                   <div className="space-y-2">
-//                     <label className="text-sm font-medium">Search</label>
-//                     <div className="relative">
-//                       <BiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-//                       <Input
-//                         placeholder="Search by order number or customer..."
-//                         className="pl-9"
-//                         value={localSearch}
-//                         onChange={(e) => setLocalSearch(e.target.value)}
-//                       />
-//                     </div>
-//                   </div>
-
-//                   <div className="space-y-2 w-40">
-//                     <label className="text-sm font-medium">Status</label>
-//                     <Select
-//                       value={localStatus}
-//                       onValueChange={(val) => setLocalStatus(val)}
-//                     >
-//                       <SelectTrigger className="w-full">
-//                         <SelectValue placeholder="All Status" />
-//                       </SelectTrigger>
-//                       <SelectContent>
-//                         <SelectItem value="all">All Status</SelectItem>
-//                         <SelectItem value={OrderStatus.PENDING}>Pending</SelectItem>
-//                         <SelectItem value={OrderStatus.PROCESSING}>Processing</SelectItem>
-//                         <SelectItem value={OrderStatus.COMPLETED}>Completed</SelectItem>
-//                         <SelectItem value={OrderStatus.CANCELLED}>Cancelled</SelectItem>
-//                       </SelectContent>
-//                     </Select>
-//                   </div>
-//                 </div>
-//               </div>
-//             </Card>
-//           )}
-
-//           {/* Active Filters Display */}
-//           {activeFiltersCount > 0 && (
-//             <div className="mb-4 flex flex-wrap gap-2 items-center px-3">
-//               <span className="text-sm text-gray-600 font-medium">Active Filters:</span>
-//               {searchText && (
-//                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-100 text-purple-800">
-//                   Search: {searchText}
-//                   <button
-//                     onClick={() => {
-//                       setLocalSearch("");
-//                       dispatch({ type: "SET_SEARCH", payload: "" });
-//                       dispatch({ type: "SET_PAGE", payload: 1 });
-//                     }}
-//                     className="ml-2 hover:text-purple-600 font-bold"
-//                   >
-//                     ×
-//                   </button>
-//                 </span>
-//               )}
-//               {status && (
-//                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-100 text-green-800">
-//                   Status: {status}
-//                   <button
-//                     onClick={() => {
-//                       setLocalStatus("all");
-//                       dispatch({ type: "SET_STATUS", payload: undefined });
-//                       dispatch({ type: "SET_PAGE", payload: 1 });
-//                     }}
-//                     className="ml-2 hover:text-green-600 font-bold"
-//                   >
-//                     ×
-//                   </button>
-//                 </span>
-//               )}
-//               <Button
-//                 variant="ghost"
-//                 size="sm"
-//                 onClick={handleResetFilters}
-//                 className="text-red-600 ml-auto hover:text-red-700"
-//               >
-//                 <FilterX className="size-4 mr-1" />
-//                 Reset All Filters
-//               </Button>
-//             </div>
-//           )}
-
-//           {/* Stats */}
-//           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-//             <Card>
-//               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-//                 <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-//                 <BiShoppingBag className="h-4 w-4 text-muted-foreground" />
-//               </CardHeader>
-//               <CardContent>
-//                 <div className="text-2xl font-bold">{totalOrders}</div>
-//               </CardContent>
-//             </Card>
-//             <Card>
-//               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-//                 <CardTitle className="text-sm font-medium">Pending</CardTitle>
-//                 <BiTime className="h-4 w-4 text-muted-foreground" />
-//               </CardHeader>
-//               <CardContent>
-//                 <div className="text-2xl font-bold">{pendingCount}</div>
-//               </CardContent>
-//             </Card>
-//             <Card>
-//               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-//                 <CardTitle className="text-sm font-medium">Processing</CardTitle>
-//                 <BiTime className="h-4 w-4 text-muted-foreground" />
-//               </CardHeader>
-//               <CardContent>
-//                 <div className="text-2xl font-bold">{processingCount}</div>
-//               </CardContent>
-//             </Card>
-//             <Card>
-//               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-//                 <CardTitle className="text-sm font-medium">Completed</CardTitle>
-//                 <BiCheckCircle className="h-4 w-4 text-muted-foreground" />
-//               </CardHeader>
-//               <CardContent>
-//                 <div className="text-2xl font-bold">{completedCount}</div>
-//               </CardContent>
-//             </Card>
-//             <Card>
-//               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-//                 <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-//                 <BiDollar className="h-4 w-4 text-muted-foreground" />
-//               </CardHeader>
-//               <CardContent>
-//                 <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-//               </CardContent>
-//             </Card>
-//           </div>
-
-//           {/* Table */}
-//           {error ? (
-//             <div className="p-4 text-red-500 bg-red-50 rounded-lg">
-//               <div className="font-semibold">Error loading orders</div>
-//               <div className="text-sm mt-1">{error.message}</div>
-//               <Button
-//                 variant="destructive"
-//                 onClick={() => refetch()}
-//                 className="mt-3"
-//               >
-//                 Retry
-//               </Button>
-//             </div>
-//           ) : (
-//             <TableBox
-//               column={columns}
-//               checkbox={canManage}
-//               action={canManage}
-//               loading={showTableLoading}
-//               data={orders}
-//               currentPage={currentPage}
-//               totalPages={totalPages}
-//               setCurrentPage={(page) =>
-//                 dispatch({ type: "SET_PAGE", payload: page })
-//               }
-//               deletehandler={deleteHandler}
-//               edithandler={editHandler}
-//               height="max-h-[calc(100vh-420px)]"
-//               createdAt={true}
-//               updatedAt={true}
-//               customRenderers={customRenderers}
-//             />
-//           )}
-//         </div>
-//       </div>
-
-//       {/* Delete Confirmation Dialog */}
-//       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-//         <DialogContent>
-//           <DialogHeader>
-//             <DialogTitle>Delete Orders</DialogTitle>
-//             <DialogDescription>
-//               Are you sure you want to delete {selectedIds.length} order(s)?
-//               This action cannot be undone.
-//             </DialogDescription>
-//           </DialogHeader>
-//           <DialogFooter>
-//             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-//               Cancel
-//             </Button>
-//             <Button
-//               variant="destructive"
-//               onClick={handleDelete}
-//               disabled={isDeleting}
-//             >
-//               {isDeleting ? "Deleting..." : "Delete"}
-//             </Button>
-//           </DialogFooter>
-//         </DialogContent>
-//       </Dialog>
-
-//       {/* Add/Edit Order Modal */}
-//       {/* {showAddEditDialog && (
-//         <AddOrderTicket
-//           onCancel={() => setShowAddEditDialog(false)}
-//           selectedData={editingOrder}
-//           isEditMode={!!editingOrder}
-//           refetch={refetch}
-//           currentMemberId={currentMember?.id}
-//         />
-//       )} */}
-//     </Container>
-//   );
-// };
-
-// export default AllOrderTicketPage;
+export default Page;

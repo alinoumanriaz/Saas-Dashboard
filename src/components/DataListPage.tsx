@@ -86,6 +86,7 @@ export type DataListPageProps = {
   // Refresh & Add
   onRefresh: () => void;
   refreshing: boolean;
+  networkStatus: any;
   onAdd?: () => void;
   addLabel?: string;
   addDisabled?: boolean;
@@ -126,6 +127,7 @@ export function DataListPage({
   activeFiltersCount,
   onRefresh,
   refreshing,
+  networkStatus,
   onAdd,
   addLabel = "Add",
   addDisabled = false,
@@ -187,7 +189,7 @@ export function DataListPage({
                 disabled={refreshing}
                 className="gap-1"
               >
-                {refreshing ? (
+                {networkStatus === 4 ? (
                   <>
                     <RefreshCw className="size-4 animate-spin" />
                     <span>Refreshing...</span>

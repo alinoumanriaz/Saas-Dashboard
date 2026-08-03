@@ -7,6 +7,10 @@ import { cn } from "@/lib/utils";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { MantineProvider } from "@mantine/core";
+import '@mantine/core/styles.css';        // 👈 must be imported
+import '@mantine/tiptap/styles.css';      // 👈 must be imported
+import './globals.css'; 
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -32,7 +36,9 @@ export default function RootLayout({
           <Providers>
             <ApolloWrapper>
               <ToastContainer />
+              <MantineProvider>
               {children}
+              </MantineProvider>
             </ApolloWrapper>
           </Providers>
         </ThemeProvider>

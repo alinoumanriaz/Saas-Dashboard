@@ -57,7 +57,7 @@ interface CloudinaryImage {
   original_filename: string;
 }
 
-interface GalleryModelProps {
+interface WebsiteGalleryModelProps {
   onCancel: () => void;
   onSentSelected: (images: IImageData[]) => void;
   mode?: "single" | "multiple";
@@ -68,11 +68,11 @@ const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // ===================== Component =====================
-const GalleryModel = ({
+const WebsiteGalleryModel = ({
   onCancel,
   onSentSelected,
   mode = "multiple",
-}: GalleryModelProps) => {
+}: WebsiteGalleryModelProps) => {
   const [activeTab, setActiveTab] = useState<"gallery" | "upload">("gallery");
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<CloudinaryImage[]>([]);
@@ -807,4 +807,4 @@ const GalleryModel = ({
   );
 };
 
-export default GalleryModel;
+export default WebsiteGalleryModel;

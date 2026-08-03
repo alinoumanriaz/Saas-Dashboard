@@ -12,6 +12,32 @@ export enum PlatformRole {
     ADMIN = 'ADMIN',
 }
 
+export enum TicketStatus {
+  OPEN = 'OPEN',
+  IN_PROGRESS = 'IN_PROGRESS',
+  WAITING_CUSTOMER = 'WAITING_CUSTOMER',
+  RESOLVED = 'RESOLVED',
+  CLOSED = 'CLOSED',
+}
+
+export enum TicketPriority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT',
+}
+
+export enum Task {
+  GENERAL = 'GENERAL',
+  DESIGN = 'DESIGN',
+  DESIGN_REVISION = 'DESIGN_REVISION',
+  PRODUCTION = 'PRODUCTION',
+  SHIPPING = 'SHIPPING',
+  PAYMENT = 'PAYMENT',
+  DELIVERY = 'DELIVERY',
+  OTHER = 'OTHER',
+}
+
 export enum MemberStatus {
     ACTIVE = 'ACTIVE',
     INACTIVE = 'INACTIVE',

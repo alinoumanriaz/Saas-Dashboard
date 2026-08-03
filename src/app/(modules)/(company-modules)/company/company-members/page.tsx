@@ -70,8 +70,8 @@ const CompanyMembersPage = () => {
   // Debounce filter changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      const roleVal = localRole === "all" ? undefined : localRole;
-      const statusVal = localStatus === "all" ? undefined : localStatus;
+      const roleVal = localRole === "" ? undefined : localRole;
+      const statusVal = localStatus === "" ? undefined : localStatus;
       dispatch({ type: "SET_ROLE", payload: roleVal });
       dispatch({ type: "SET_STATUS", payload: statusVal });
       dispatch({ type: "SET_SEARCH", payload: localSearch || "" });
@@ -81,8 +81,8 @@ const CompanyMembersPage = () => {
   }, [localRole, localStatus, localSearch, dispatch]);
 
   const handleResetFilters = () => {
-    setLocalRole("all");
-    setLocalStatus("all");
+    setLocalRole("");
+    setLocalStatus("");
     setLocalSearch("");
     dispatch({ type: "RESET_FILTERS" });
   };

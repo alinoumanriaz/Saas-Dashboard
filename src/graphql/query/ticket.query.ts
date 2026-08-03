@@ -1,43 +1,67 @@
-import { gql } from "@apollo/client";
+import { gql } from '@apollo/client';
 
 export const GET_PAGINATED_TICKETS = gql`
-  query GetPaginatedTickets($page: Int!, $limit: Int!, $search: String) {
-    getPaginatedTickets(page: $page, limit: $limit, search: $search) {
+  query GetPaginatedTickets(
+    $page: Int
+    $limit: Int
+    $status: TicketStatus
+    $search: String
+    $companyId: String
+  ) {
+    getPaginatedTickets(
+      page: $page
+      limit: $limit
+      status: $status
+      search: $search
+      companyId: $companyId
+    ) {
       tickets {
         id
-        name
-        email
-        phone
-        material
-        style
-        stock
-        color
-        length
-        width
-        height
-        attachmentUrl
+        ticketNumber
+        subject
+        status
+        priority
+        task
         createdAt
+        updatedAt
+        companyId {
+          id
+          name
+        }
+        createdBy {
+          id
+          username
+          avatar
+        }
       }
-      totalTickets
+      totalTicketsCount
     }
   }
 `;
 
-export const TICKET_COUNT = gql`
-  query {
-    getTicketCount {
-      totalTicketCount
-      todayTicketCount
-      totalInLast12Months
-      last7DaysTicketCount
-      recordMonth {
-        month
-        count
-      }
-      monthlyCounts {
-        month
-        count
-      }
+export const DELETE_TICKETS = gql`
+  mutation DeleteTickets($ids: [String!]!) {
+    deleteTickets(ids: $ids) {
+      success
+      message
+    }
+  }
+`;
+
+export const CREATE_TICKET = gql`
+  mutation CreateTicket($input: CreateTicketInput!) {
+    createTicket(input: $input) {
+      success
+      message
+    }
+  }
+`;
+
+export const UPDATE_TICKET = gql`
+  mutation UpdateTicket($id: String!, $input: UpdateTicketInput!) {
+    updateTicket(id: $id, input: $input) {
+      success
+      message
     }
   }
 `;

@@ -1,106 +1,190 @@
-
 "use client";
-import React, { useEffect, useReducer, useState } from "react";
-import { BiSearch } from "react-icons/bi";
-import TableBox from "@/components/tablebox/TableBox";
-import Container from "@/components/Container";
-import { useMutation, useQuery } from "@apollo/client";
+
+import { useEffect, useReducer, useState } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
+import { toast } from "sonner";
+import { useAppSelector } from "@/redux/hooks";
 import {
   filterReducer,
   initialFilterState,
 } from "@/useReducerHooks/user-filter-reducer";
+import { GET_PAGINATED_MATERIALS, DELETE_MATERIALS } from "@/graphql/current-website-queries/material.query";
+import {
+  DataListPage,
+  FilterConfig,
+} from "@/components/DataListPage";
 import ConfirmationBox from "@/components/popup/models/ConfirmationBox";
-import { toast } from "react-toastify";
 import AddMaterial from "@/components/popup/models/AddMaterial.model";
-import { DELETE_MATERIAL, GET_PAGINATED_MATERIALS } from "@/graphql/query/material.query";
-const column = ["name", "slug", "description",  "content"];
-const ITEMS_PER_PAGE = 10;
+import Image from "next/image";
 
+// --- Types ---
 interface IMaterial {
-  _id: string;
+  id: string;
   name: string;
   slug: string;
-  iconImageUrl: string;
-  imageUrl: string;
-  bannerImage: string;
+  iconImageUrl: string | { url: string; alt?: string };
+  imageUrl: string | { url: string; alt?: string };
+  bannerImage: string | { url: string; alt?: string };
   description: string;
-  content: string
+  content: string | any;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
+const ITEMS_PER_PAGE = 10;
+
+// Helper to extract image URL
+const getImageUrl = (field: any): string => {
+  if (!field) return "";
+  if (typeof field === "string") return field;
+  return field.url || "";
+};
+
 const Page = () => {
+  const companyCurrentWebsite = useAppSelector(
+    (state) => state.companyCurrentWebsite.companyWebsite
+  );
+  const currentWebsiteId = companyCurrentWebsite?.id;
+
   const [state, dispatch] = useReducer(filterReducer, initialFilterState);
   const { currentPage, searchText } = state;
-  const [selectedData, setSelectedData] = useState<any | null>(null);
-  const [debouncedSearch, setDebouncedSearch] = useState(searchText);
+
+  const [localSearch, setLocalSearch] = useState<string>(searchText || "");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      dispatch({ type: "SET_SEARCH", payload: localSearch || "" });
+      dispatch({ type: "SET_PAGE", payload: 1 });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localSearch, dispatch]);
+
+  const [selectedData, setSelectedData] = useState<IMaterial | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showConfirmationModel, setShowConfirmationModel] = useState(false);
   const [showAddModel, setShowAddModel] = useState(false);
-  const [selectedIdsForDeleteion, setSelectedIdsForDeleteion] = useState<
-    string[]
-  >([]);
+  const [selectedIdsForDeletion, setSelectedIdsForDeletion] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchText);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchText]);
+  const { data, loading, error, refetch, networkStatus } = useQuery<any>(
+    GET_PAGINATED_MATERIALS,
+    {
+      variables: {
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        search: searchText || undefined,
+      },
+      skip: !currentWebsiteId,
+      fetchPolicy: "network-only",
+      notifyOnNetworkStatusChange: true,
+    }
+  );
 
-  const { data, loading, error, refetch } = useQuery(GET_PAGINATED_MATERIALS, {
-    variables: {
-      page: currentPage,
-      limit: ITEMS_PER_PAGE,
-      search: debouncedSearch || undefined,
-    },
-    fetchPolicy: "network-only",
-  });
+  const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
 
-  console.log({ materialpagenatedData: data });
-  const [deleteMaterials] = useMutation(DELETE_MATERIAL);
+  const [deleteMaterials] = useMutation<any>(DELETE_MATERIALS);
 
-  const alldata: IMaterial[] = data?.getPaginatedMaterials?.materials || [];
-  console.log({ materialpagenatedData: alldata });
+  const allMaterials: IMaterial[] =
+    data?.getPaginatedMaterials?.materials || [];
   const totalMaterials = data?.getPaginatedMaterials?.totalMaterials || 0;
   const totalPages = Math.ceil(totalMaterials / ITEMS_PER_PAGE);
 
+  console.log({allMaterials:allMaterials})
+
+  // Map data to include `id` for TableBox compatibility
+  const materialsData = allMaterials.map((material) => ({
+    ...material,
+    id: material.id,
+  }));
+
+  // const materialsWithContent = allMaterials.filter((m) => {
+  //   const content = m.content;
+  //   if (typeof content === "string") return content.trim().length > 0;
+  //   if (content && typeof content === "object") return true;
+  //   return false;
+  // }).length;
+
+  // Stats cards
+  // const stats: StatsCard[] = [
+  //   {
+  //     label: "Total Materials",
+  //     value: totalMaterials,
+  //     icon: <Building className="h-5 w-5 text-blue-600" />,
+  //   },
+  //   {
+  //     label: "With Content",
+  //     value: materialsWithContent,
+  //     icon: <CheckCircle className="h-5 w-5 text-green-600" />,
+  //   },
+  // ];
+
+  // Filter configuration
+  const filterConfig: FilterConfig[] = [
+    {
+      key: "search",
+      type: "search",
+      placeholder: "Search by name, slug, or description...",
+      label: "Search",
+    },
+  ];
+
+  const filterValues = {
+    search: localSearch,
+  };
+
+  const activeFiltersCount = searchText && searchText.length > 0 ? 1 : 0;
+
+  const handleResetFilters = () => {
+    setLocalSearch("");
+    dispatch({ type: "RESET_FILTERS" });
+  };
+
+  // Handlers
   const cancelDelete = () => {
-    setSelectedIdsForDeleteion([]);
-    console.log({ selectedIdsForDeleteion: selectedIdsForDeleteion });
+    setSelectedIdsForDeletion([]);
     setShowConfirmationModel(false);
   };
+
   const confirmDelete = async () => {
     setIsDeleting(true);
-    console.log({ selectedIdsForDeleteion: selectedIdsForDeleteion });
-    if (selectedIdsForDeleteion.length === 0) return;
-    console.log({selectedIdsForDeleteion:selectedIdsForDeleteion})
+    if (selectedIdsForDeletion.length === 0) return;
 
-    const { data } = await deleteMaterials({
-      variables: { ids: selectedIdsForDeleteion },
-    });
+    try {
+      const { data } = await deleteMaterials({
+        variables: { ids: selectedIdsForDeletion },
+      });
 
-    console.log({data:data})
-    setIsDeleting(false);
-    if (data?.deleteMaterials?.success) {
-      toast.success(data.deleteMaterials.message);
-      setShowConfirmationModel(false);
-      refetch(); // refresh list
-      setSelectedIdsForDeleteion([]);
-    } else {
-      console.log("frontend confirm delete funstion not working");
-      toast.error(data?.deleteMaterials?.message || "Failed to delete Materials");
+      if (data?.deleteMaterials?.success) {
+        console.log({deleetdata:data})
+        toast.success(data.deleteMaterials.message, { position: "top-center" });
+        setShowConfirmationModel(false);
+        refetch();
+        setSelectedIdsForDeletion([]);
+      } else {
+        toast.error(data?.deleteMaterials?.message || "Failed to delete materials", {
+          position: "top-center",
+        });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete materials", { position: "top-center" });
+    } finally {
+      setIsDeleting(false);
     }
   };
-  const deleteHandler = async (id: string[]) => {
-    setSelectedIdsForDeleteion(id);
+
+  const deleteHandler = (ids: string[]) => {
+    setSelectedIdsForDeletion(ids);
     setShowConfirmationModel(true);
   };
-  const editHandler = (cData: any) => {
+
+  const editHandler = (material: any) => {
+    // Use the original material object (with _id)
+    const original = allMaterials.find((m: any) => m.id === material.id) || material;
     setIsEditMode(true);
-    setSelectedData(cData);
+    setSelectedData(original);
     setShowAddModel(true);
-    console.log(isEditMode);
-    console.log(cData);
   };
 
   const addHandler = () => {
@@ -113,121 +197,132 @@ const Page = () => {
     setShowAddModel(false);
   };
 
-  return (
-    <Container>
-      <div className="w-full text-[13px]">
-        <div className="w-full ring-1 ring-gray-300/80 bg-white rounded-md overflow-hidden px-4">
-          <div className="flex justify-between items-center">
-            <div className="p-6 space-y-1">
-              <div className="text-lg">Materials List</div>
-              <div className=" text-gray-600">
-                You have {totalMaterials} Materials.
-              </div>
-            </div>
+  // Columns and custom renderers
+  const columns = ["images", "name", "slug", "description", "content", "createdAt", "updatedAt"];
 
-            <div className="flex p-6 justify-center items-center space-x-2">
-              {/* Role Filter */}
-              {/* <select
-                onChange={(e) =>
-                  dispatch({
-                    type: "SET_ROLE",
-                    payload: e.target.value || undefined,
-                  })
-                }
-                className="px-6 py-1 outline-none ring-1 ring-gray-400 text-gray-500 rounded-md"
-              >
-                <option value="">-- Select Role --</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="customer">Customer</option>
-              </select> */}
-
-              {/* Verified Filter */}
-              {/* <select
-                value={isVerified === undefined ? "" : String(isVerified)}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  dispatch({
-                    type: "SET_VERIFIED",
-                    payload:
-                      val === "true"
-                        ? true
-                        : val === "false"
-                        ? false
-                        : undefined,
-                  });
-                }}
-                className="px-6 py-1 outline-none ring-1 ring-gray-400 text-gray-500 rounded-md"
-              >
-                <option value="">-- Verified --</option>
-                <option value="true">Verified</option>
-                <option value="false">Unverified</option>
-              </select> */}
-
-              {/* Search Input */}
-              <div className="relative ring-1 ring-gray-300 rounded-md">
-                <input
-                  onChange={(e) =>
-                    dispatch({ type: "SET_SEARCH", payload: e.target.value })
-                  }
-                  className="placeholder:text-gray-500/80 w-60 outline-none focus:ring-1 focus:ring-gray-700/40 py-1 pl-2 pr-8 bg-white rounded-md"
-                  placeholder="Search any field"
-                  type="text"
-                  value={searchText}
-                />
-                <BiSearch className="absolute size-5 top-1 right-2.5 z-10 text-gray-500" />
-              </div>
-
-              {/* Reset Button */}
-              <button
-                onClick={() => dispatch({ type: "RESET_FILTERS" })}
-                className="px-4 py-1 rounded-md bg-gray-100 text-gray-700 ring-1 ring-gray-300"
-              >
-                Reset
-              </button>
-              <button
-                onClick={addHandler}
-                className="px-4 py-1 text-sm rounded-md bg-blue-700 text-white ring-1 "
-              >
-                Add Material
-              </button>
-            </div>
-          </div>
-
-          {/* Error or Table */}
-          {error ? (
-            <div className="p-4 text-red-500">
-              Error loading materials: {error.message}
-            </div>
-          ) : (
-            <TableBox
-              column={column}
-              checkbox={true}
-              action={true}
-              loading={loading}
-              data={alldata}
-              image={true}
-              iconImageUrl={true}
-              bannerImage={true}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              setCurrentPage={(page) =>
-                dispatch({ type: "SET_PAGE", payload: page })
-              }
-              status={false}
-              isVerified={false}
-              deletehandler={deleteHandler}
-              edithandler={editHandler}
-              createdAt={true}
-              updatedAt={true}
-            />
-          )}
-        </div>
+  const customRenderers = {
+    images: (value: string, row: any) => (
+      <div className="flex items-center gap-2">
+        {row.iconImageUrl && (
+          <Image
+            src={getImageUrl(row.iconImageUrl)}
+            alt={row.name}
+            className="h-8 w-8 rounded object-cover"
+            width={80}
+            height={80}
+          />
+        )}
+        {row.imageUrl && (
+          <Image
+            src={getImageUrl(row.imageUrl[0])}
+            alt={row.name}
+            className="h-8 w-8 rounded object-cover"
+            width={80}
+            height={80}
+          />
+        )}
+        {row.bannerImage && (
+          <Image
+            src={getImageUrl(row.bannerImage)}
+            alt={row.name}
+            className="h-8 w-8 rounded object-cover"
+            width={80}
+            height={80}
+          />
+        )}
       </div>
+    ),
+    name: (value: string) => (
+      <div className="flex items-center gap-2">
+        <span className="font-medium">{value}</span>
+      </div>
+    ),
+    description: (value: string) => (
+      <div className="max-w-50 truncate" title={value || ""}>
+        {value || "—"}
+      </div>
+    ),
+    content: (value: any) => {
+      if (!value) return "—";
+      let display = "";
+      if (typeof value === "string") {
+        display = value;
+      } else if (typeof value === "object") {
+        display = value.text || value.content || JSON.stringify(value);
+      }
+      const truncated = display.length > 80 ? display.substring(0, 80) + "..." : display;
+      return (
+        <div className="max-w-50 truncate" title={display}>
+          {truncated || "—"}
+        </div>
+      );
+    },
+    createdAt: (value: string) =>
+      value ? new Date(value).toLocaleDateString() : "—",
+    updatedAt: (value: string) =>
+      value ? new Date(value).toLocaleDateString() : "—",
+  };
+
+  const tableBoxConfig = {
+    column: columns,
+    checkbox: true,
+    action: true,
+    deletehandler: deleteHandler,
+    edithandler: editHandler,
+    height: "max-h-[calc(100vh-180px)]",
+    createdAt: false,
+    updatedAt: false,
+    customRenderers,
+  };
+
+  const canManage = true;
+
+  return (
+    <DataListPage
+      title="Material Management"
+      subtitle={<span>Total Materials: {totalMaterials}</span>}
+      // stats={stats}
+      filterConfig={filterConfig}
+      filterValues={filterValues}
+      onFilterChange={(key, value) => {
+        if (key === "search") setLocalSearch(value || "");
+      }}
+      onResetFilters={handleResetFilters}
+      showFilters={showFilters}
+      onToggleFilters={() => setShowFilters(!showFilters)}
+      activeFiltersCount={activeFiltersCount}
+      onRefresh={() => refetch()}
+      refreshing={showTableLoading}
+      networkStatus={networkStatus}
+      onAdd={addHandler}
+      addLabel="Add Material"
+      addDisabled={false}
+      data={materialsData}  // <-- use the mapped data with `id`
+      loading={showTableLoading}
+      currentPage={currentPage}
+      totalPages={totalPages}
+      setCurrentPage={(page) => dispatch({ type: "SET_PAGE", payload: page })}
+      tableBoxConfig={tableBoxConfig}
+      error={error}
+      onRetry={() => refetch()}
+      canManage={canManage}
+    >
+      {/* Confirmation Modal */}
       {showConfirmationModel && (
-        <ConfirmationBox onCancel={cancelDelete} onDelete={confirmDelete} loading={isDeleting} />
+        <ConfirmationBox
+          onCancel={cancelDelete}
+          onDelete={confirmDelete}
+          title="Delete Materials"
+          message={`Are you sure you want to delete ${selectedIdsForDeletion.length} material${
+            selectedIdsForDeletion.length === 1 ? "" : "s"
+          }? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          loading={isDeleting}
+        />
       )}
 
+      {/* Add / Edit Modal */}
       {showAddModel && (
         <AddMaterial
           onCancel={cancelAdd}
@@ -236,7 +331,7 @@ const Page = () => {
           selectedData={selectedData}
         />
       )}
-    </Container>
+    </DataListPage>
   );
 };
 
