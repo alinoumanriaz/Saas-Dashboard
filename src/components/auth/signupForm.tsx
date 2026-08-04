@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { ChangeEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,8 +9,6 @@ import LoaderSpin from "@/components/LoaderSpin";
 import { REGISTER_MEMBER } from "@/graphql/query/member.query";
 import { useAppDispatch } from "@/redux/hooks";
 import { setMember } from "@/redux/slicers/currentMember";
-
-import { TiUser } from "react-icons/ti";
 import { TbPasswordFingerprint } from "react-icons/tb";
 import { PiEye, PiEyeClosed } from "react-icons/pi";
 import { MdEmail, MdPerson, MdPhone } from "react-icons/md";
@@ -128,13 +125,13 @@ const SignupForm = () => {
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+  // const togglePasswordVisibility = () => {
+  //   setShowPassword(!showPassword);
+  // };
 
-  const toggleConfirmPasswordVisibility = () => {
-    setShowConfirmPassword(!showConfirmPassword);
-  };
+  // const toggleConfirmPasswordVisibility = () => {
+  //   setShowConfirmPassword(!showConfirmPassword);
+  // };
 
   return (
     <div className="w-full max-w-110 text-blue-500 p-8">
@@ -220,7 +217,6 @@ const SignupForm = () => {
           <InputBox
             firstIcon={TbPasswordFingerprint}
             secondIcon={showPassword ? PiEyeClosed : PiEye}
-            onSecondIconClick={togglePasswordVisibility}
             name="password"
             type={showPassword ? "text" : "password"}
             value={form.password}
@@ -235,7 +231,6 @@ const SignupForm = () => {
           <InputBox
             firstIcon={TbPasswordFingerprint}
             secondIcon={showConfirmPassword ? PiEyeClosed : PiEye}
-            onSecondIconClick={toggleConfirmPasswordVisibility}
             name="confirmPassword"
             type={showConfirmPassword ? "text" : "password"}
             value={form.confirmPassword}
