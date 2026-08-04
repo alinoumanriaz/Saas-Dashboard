@@ -9,7 +9,7 @@ import { SetContextLink } from "@apollo/client/link/context";
 import { store } from "@/redux/store";
 
 const httpLink = new HttpLink({
-  uri: process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://localhost:3000/graphql",
+  uri: `${process.env.NEXT_PUBLIC_API_URL}/graphql` || "http://localhost:3000/graphql",
   credentials: "include",
 });
 
