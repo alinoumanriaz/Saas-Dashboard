@@ -316,6 +316,7 @@ const AllCompaniesPage = () => {
       activeFiltersCount={activeFiltersCount}
       onRefresh={() => refetch()}
       refreshing={showTableLoading}
+      networkStatus={networkStatus}
       onAdd={addHandler}
       addLabel="Add Company"
       addDisabled={!canAdd}

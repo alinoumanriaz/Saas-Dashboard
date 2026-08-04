@@ -271,6 +271,7 @@ const Page = () => {
       activeFiltersCount={activeFiltersCount}
       onRefresh={() => refetch()}
       refreshing={showTableLoading}
+      networkStatus={networkStatus}
       onAdd={addHandler}
       addLabel="Create Module"
       addDisabled={!canManage}

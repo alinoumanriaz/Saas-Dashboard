@@ -330,6 +330,7 @@ const Page = () => {
       onToggleFilters={() => setShowFilters(!showFilters)}
       activeFiltersCount={activeFiltersCount}
       onRefresh={() => refetch()}
+      networkStatus={networkStatus}
       refreshing={showTableLoading}
       onAdd={addHandler}
       addLabel="Add Member"

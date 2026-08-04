@@ -323,6 +323,7 @@ const Page = () => {
       }}
       onResetFilters={handleResetFilters}
       showFilters={showFilters}
+      networkStatus={networkStatus}
       onToggleFilters={() => setShowFilters(!showFilters)}
       activeFiltersCount={activeFiltersCount}
       onRefresh={() => refetch()}
