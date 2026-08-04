@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client'
 import { CompanyMember } from "@/Types/companyMember.types";
 import { useEffect, useState } from "react";

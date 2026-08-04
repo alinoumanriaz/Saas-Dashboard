@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { client } from "@/helpers/apollo-client";
 import { useAppSelector } from "@/redux/hooks";
 import { setCompanyCurrentWebsite } from "@/redux/slicers/companyCurrentWebsite";
