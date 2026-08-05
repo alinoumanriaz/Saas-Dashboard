@@ -18,10 +18,10 @@ export default function useLogout() {
         try {
           dispatch(clearMember());
           await client.clearStore();
-          router.push("/sign_in");
+          router.push("/auth/sign_in");
         } catch (err) {
           console.error("Error during logout cleanup", err);
-          router.push("/sign_in");
+          router.push("/auth/sign_in");
         }
       }
     },
@@ -29,7 +29,7 @@ export default function useLogout() {
       console.error("Logout mutation failed", err);
       dispatch(clearMember());
       client.clearStore();
-      router.push("/sign_in");
+      router.push("/auth/sign_in");
     },
   });
 
