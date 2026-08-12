@@ -90,6 +90,7 @@ export const GET_ALL_INDUSTRY = gql`
   }
 `;
 
+
 export const CHECK_INDUSTRY_SLUG_UNIQUE = gql`
   query CheckIndustrySlugUnique($slug: String!, $excludeId: String) {
     checkIndustrySlugUnique(slug: $slug, excludeId: $excludeId) {

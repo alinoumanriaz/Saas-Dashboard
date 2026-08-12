@@ -402,7 +402,7 @@
 //         refetch();
 //         onCancel();
 //       } else {
-//         toast.error("Operation failed", { position: "top-center" });
+//         toast.error("Operation failed");
 //       }
 //     } catch (error: any) {
 //       toast.error(error.message || "An error occurred", {

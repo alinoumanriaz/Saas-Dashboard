@@ -158,7 +158,7 @@ const Page = () => {
 
       if (data?.deleteStyles?.success) {
         console.log({deleetdata:data})
-        toast.success(data.deleteStyles.message, { position: "top-center" });
+        toast.success(data.deleteStyles.message);
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
@@ -168,7 +168,7 @@ const Page = () => {
         });
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete styles", { position: "top-center" });
+      toast.error(err.message || "Failed to delete styles");
     } finally {
       setIsDeleting(false);
     }

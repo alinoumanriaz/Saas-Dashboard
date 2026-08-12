@@ -212,7 +212,7 @@ const TermsConditionsPage = () => {
     {
       onCompleted: (data) => {
         if (data.updatePage.success) {
-          toast.success("Page updated successfully", { position: "top-center" });
+          toast.success("Page updated successfully");
           setIsEditing(false);
           setIsDirty(false);
           setH1CheckStatus("idle");
@@ -315,7 +315,7 @@ const TermsConditionsPage = () => {
 
   const handleSave = async () => {
     if (!pageId) {
-      return toast.error("No page ID available", { position: "top-center" });
+      return toast.error("No page ID available");
     }
     if (!currentcompanyMember?.id) {
       return toast.error("You must be signed in to save changes", {
@@ -331,7 +331,7 @@ const TermsConditionsPage = () => {
       );
     }
     if (!metaTitle.trim()) {
-      return toast.warning("Meta title is required", { position: "top-center" });
+      return toast.warning("Meta title is required");
     }
     if (h1CheckStatus === "taken") {
       return toast.warning("Choose a unique H1 tag before saving", {
@@ -374,7 +374,7 @@ const TermsConditionsPage = () => {
   // ---------- Unique checks ----------
   const checkH1TagUnique = async () => {
     if (!h1Tag.trim()) {
-      toast.warning("Enter an H1 tag first", { position: "top-center" });
+      toast.warning("Enter an H1 tag first");
       return;
     }
     setH1CheckStatus("checking");
@@ -391,10 +391,10 @@ const TermsConditionsPage = () => {
       });
       if (data?.checkUnique?.isUnique) {
         setH1CheckStatus("available");
-        toast.success("H1 tag is available", { position: "top-center" });
+        toast.success("H1 tag is available");
       } else {
         setH1CheckStatus("taken");
-        toast.warning("That H1 tag is already in use", { position: "top-center" });
+        toast.warning("That H1 tag is already in use");
       }
     } catch (err: any) {
       setH1CheckStatus("idle");
@@ -406,7 +406,7 @@ const TermsConditionsPage = () => {
 
   const checkMetaTitleUnique = async () => {
     if (!metaTitle.trim()) {
-      toast.warning("Enter a meta title first", { position: "top-center" });
+      toast.warning("Enter a meta title first");
       return;
     }
     setMetaTitleCheckStatus("checking");
@@ -423,7 +423,7 @@ const TermsConditionsPage = () => {
       });
       if (data?.checkUnique?.isUnique) {
         setMetaTitleCheckStatus("available");
-        toast.success("Meta title is available", { position: "top-center" });
+        toast.success("Meta title is available");
       } else {
         setMetaTitleCheckStatus("taken");
         toast.warning("That meta title is already in use", {
@@ -441,7 +441,7 @@ const TermsConditionsPage = () => {
   const checkMetaDescriptionStatus = () => {
     const status = checkMetaDescLength(metaDescription);
     if (status === "empty") {
-      toast.info("Meta description is empty", { position: "top-center" });
+      toast.info("Meta description is empty");
       return;
     }
     setMetaDescCheckStatus(status);

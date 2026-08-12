@@ -299,7 +299,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
           { position: "top-center" }
         );
       } else {
-        toast.error(msg, { position: "top-center" });
+        toast.error(msg);
       }
     } finally {
       setLoading(false);

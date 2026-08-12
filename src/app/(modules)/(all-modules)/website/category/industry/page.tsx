@@ -158,7 +158,7 @@ const Page = () => {
 
       if (data?.deleteIndustries?.success) {
         console.log({deleetdata:data})
-        toast.success(data.deleteIndustries.message, { position: "top-center" });
+        toast.success(data.deleteIndustries.message);
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
@@ -168,7 +168,7 @@ const Page = () => {
         });
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete industries", { position: "top-center" });
+      toast.error(err.message || "Failed to delete industries");
     } finally {
       setIsDeleting(false);
     }

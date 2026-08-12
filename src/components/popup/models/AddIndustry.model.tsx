@@ -14,10 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-// Custom components
-import { DynamicForm, TabConfig } from "@/components/DynamicFormPopup";
+// Custom components – now using DynamicFormPopup
+// import { DynamicFormPopup, TabConfig } from "@/components/DynamicFormPopup";
 import WebsiteGalleryModel from "./WebsiteGallery.model";
-
 // Helpers & GraphQL
 import { generateSlug } from "@/helpers/slug-maker";
 import { removeTypename } from "@/helpers/removetypename";
@@ -28,6 +27,7 @@ import {
   CREATE_INDUSTRY,
   UPDATE_INDUSTRY,
 } from "@/graphql/current-website-queries/industry.query";
+import { DynamicFormPopup, TabConfig} from "@/components/TabbedForm";
 
 // Rich Text Editor (dynamic import)
 const TiptopEditor = dynamic(() => import("../../TiptopTextEditor"), { ssr: false });
@@ -630,7 +630,7 @@ const AddIndustry = ({
       const isUnique = slugData.checkIndustrySlugUnique.isUnique;
       setSlugCheck(isUnique ? "✓ Slug is available" : "✗ Slug is already taken");
     }
-    if (slugError) toast.error("Failed to check slug availability", { position: "top-center" });
+    if (slugError) toast.error("Failed to check slug availability");
   }, [slugData, slugError]);
 
   useEffect(() => {
@@ -638,7 +638,7 @@ const AddIndustry = ({
       const isUnique = h1TagData.checkIndustryH1TagUnique.isUnique;
       setH1TagCheck(isUnique ? "✓ H1 Tag is available" : "✗ H1 Tag is already taken");
     }
-    if (h1TagError) toast.error("Failed to check H1 Tag availability", { position: "top-center" });
+    if (h1TagError) toast.error("Failed to check H1 Tag availability");
   }, [h1TagData, h1TagError]);
 
   useEffect(() => {
@@ -646,7 +646,7 @@ const AddIndustry = ({
       const isUnique = metaTitleData.checkIndustryMetaTitleUnique.isUnique;
       setMetaTitleCheck(isUnique ? "✓ Meta Title is available" : "✗ Meta Title is already taken");
     }
-    if (metaTitleError) toast.error("Failed to check Meta Title availability", { position: "top-center" });
+    if (metaTitleError) toast.error("Failed to check Meta Title availability");
   }, [metaTitleData, metaTitleError]);
 
   // ---------- Mutations ----------
@@ -671,7 +671,7 @@ const AddIndustry = ({
   // ---------- Handlers for unique checks ----------
   const checkSlugUnique = (slug: string) => {
     if (!slug?.trim()) {
-      toast.error("Please enter a slug first", { position: "top-center" });
+      toast.error("Please enter a slug first");
       return;
     }
     checkSlug({
@@ -684,7 +684,7 @@ const AddIndustry = ({
 
   const checkH1TagUnique = (h1Tag: string) => {
     if (!h1Tag?.trim()) {
-      toast.error("Please enter an H1 tag first", { position: "top-center" });
+      toast.error("Please enter an H1 tag first");
       return;
     }
     checkH1Tag({
@@ -697,7 +697,7 @@ const AddIndustry = ({
 
   const checkMetaTitleUnique = (metaTitle: string) => {
     if (!metaTitle?.trim()) {
-      toast.error("Please enter a meta title first", { position: "top-center" });
+      toast.error("Please enter a meta title first");
       return;
     }
     checkMetaTitle({
@@ -718,7 +718,7 @@ const AddIndustry = ({
 
   const addOrUpdateFaq = () => {
     if (!currentFaq.question.trim() || !currentFaq.answer.trim()) {
-      toast.error("Both question and answer are required", { position: "top-center" });
+      toast.error("Both question and answer are required");
       return;
     }
     if (editingFaqIndex !== null) {
@@ -824,23 +824,23 @@ const AddIndustry = ({
           variables: { id: selectedData.id, input: cleanInputData },
         });
         if (result.data?.updateIndustry?.success) {
-          toast.success(result.data.updateIndustry.message || "Industry updated successfully", { position: "top-center" });
+          toast.success(result.data.updateIndustry.message || "Industry updated successfully");
         } else {
-          toast.error(result.data?.updateIndustry?.message || "Failed to update industry", { position: "top-center" });
+          toast.error(result.data?.updateIndustry?.message || "Failed to update industry");
         }
       } else {
         result = await createIndustry({ variables: { input: cleanInputData } });
         if (result.data?.createIndustry?.success) {
-          toast.success(result.data.createIndustry.message || "Industry created successfully", { position: "top-center" });
+          toast.success(result.data.createIndustry.message || "Industry created successfully");
         } else {
-          toast.error(result.data?.createIndustry?.message || "Failed to create industry", { position: "top-center" });
+          toast.error(result.data?.createIndustry?.message || "Failed to create industry");
         }
       }
       if (refetch) refetch();
       onCancel();
     } catch (error: any) {
       console.error("GraphQL Error:", error);
-      toast.error(error.message || "Operation failed", { position: "top-center" });
+      toast.error(error.message || "Operation failed");
     }
   };
 
@@ -895,6 +895,7 @@ const AddIndustry = ({
     {
       id: "faqs",
       label: "FAQs",
+      badge: faqs.length > 0 ? faqs.length : undefined, // shows count on tab
       content: (
         <FaqsTab
           faqs={faqs}
@@ -913,7 +914,7 @@ const AddIndustry = ({
   // ---------- Render ----------
   return (
     <>
-      <DynamicForm<FormValues>
+      <DynamicFormPopup<FormValues>
         open={true}
         onOpenChange={onCancel}
         title={isEditMode ? "Edit Industry" : "Add New Industry"}

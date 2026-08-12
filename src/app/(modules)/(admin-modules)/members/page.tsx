@@ -180,7 +180,7 @@ const Page = () => {
     if (selectedIdsForDeleteion.length === 0) return;
 
     if (!isSuperAdmin) {
-      toast.error("Access denied", { position: "top-center" });
+      toast.error("Access denied");
       setIsDeleting(false);
       return;
     }
@@ -191,15 +191,15 @@ const Page = () => {
       });
 
       if (data?.deleteMembers?.success) {
-        toast.success(data.deleteMembers.message, { position: "top-center" });
+        toast.success(data.deleteMembers.message);
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeleteion([]);
       } else {
-        toast.error(data?.deleteMembers?.message || "Failed to delete members", { position: "top-center" });
+        toast.error(data?.deleteMembers?.message || "Failed to delete members");
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete members", { position: "top-center" });
+      toast.error(err.message || "Failed to delete members");
     } finally {
       setIsDeleting(false);
     }
@@ -212,7 +212,7 @@ const Page = () => {
 
   const editHandler = (memberData: any) => {
     if (!isSuperAdmin && !isAdmin && !isOwner) {
-      toast.error("Only SUPER_ADMIN, ADMIN, or OWNER can edit members", { position: "top-center" });
+      toast.error("Only SUPER_ADMIN, ADMIN, or OWNER can edit members");
       return;
     }
     // Additional tenant checks can be added if needed

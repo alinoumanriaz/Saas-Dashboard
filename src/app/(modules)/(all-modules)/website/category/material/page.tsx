@@ -158,7 +158,7 @@ const Page = () => {
 
       if (data?.deleteMaterials?.success) {
         console.log({deleetdata:data})
-        toast.success(data.deleteMaterials.message, { position: "top-center" });
+        toast.success(data.deleteMaterials.message);
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
@@ -168,7 +168,7 @@ const Page = () => {
         });
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete materials", { position: "top-center" });
+      toast.error(err.message || "Failed to delete materials");
     } finally {
       setIsDeleting(false);
     }

@@ -187,7 +187,7 @@ const Page = () => {
       });
 
       if (data?.deleteTickets?.success) {
-        toast.success(data.deleteTickets.message, { position: "top-center" });
+        toast.success(data.deleteTickets.message);
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
@@ -197,7 +197,7 @@ const Page = () => {
         });
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete tickets", { position: "top-center" });
+      toast.error(err.message || "Failed to delete tickets");
     } finally {
       setIsDeleting(false);
     }

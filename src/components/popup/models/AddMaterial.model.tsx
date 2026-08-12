@@ -630,7 +630,7 @@ const AddMaterial = ({
       const isUnique = slugData.checkMaterialSlugUnique.isUnique;
       setSlugCheck(isUnique ? "✓ Slug is available" : "✗ Slug is already taken");
     }
-    if (slugError) toast.error("Failed to check slug availability", { position: "top-center" });
+    if (slugError) toast.error("Failed to check slug availability");
   }, [slugData, slugError]);
 
   useEffect(() => {
@@ -638,7 +638,7 @@ const AddMaterial = ({
       const isUnique = h1TagData.checkMaterialH1TagUnique.isUnique;
       setH1TagCheck(isUnique ? "✓ H1 Tag is available" : "✗ H1 Tag is already taken");
     }
-    if (h1TagError) toast.error("Failed to check H1 Tag availability", { position: "top-center" });
+    if (h1TagError) toast.error("Failed to check H1 Tag availability");
   }, [h1TagData, h1TagError]);
 
   useEffect(() => {
@@ -646,7 +646,7 @@ const AddMaterial = ({
       const isUnique = metaTitleData.checkMaterialMetaTitleUnique.isUnique;
       setMetaTitleCheck(isUnique ? "✓ Meta Title is available" : "✗ Meta Title is already taken");
     }
-    if (metaTitleError) toast.error("Failed to check Meta Title availability", { position: "top-center" });
+    if (metaTitleError) toast.error("Failed to check Meta Title availability");
   }, [metaTitleData, metaTitleError]);
 
   // ---------- Mutations ----------
@@ -671,7 +671,7 @@ const AddMaterial = ({
   // ---------- Handlers for unique checks ----------
   const checkSlugUnique = (slug: string) => {
     if (!slug?.trim()) {
-      toast.error("Please enter a slug first", { position: "top-center" });
+      toast.error("Please enter a slug first");
       return;
     }
     checkSlug({
@@ -684,7 +684,7 @@ const AddMaterial = ({
 
   const checkH1TagUnique = (h1Tag: string) => {
     if (!h1Tag?.trim()) {
-      toast.error("Please enter an H1 tag first", { position: "top-center" });
+      toast.error("Please enter an H1 tag first");
       return;
     }
     checkH1Tag({
@@ -697,7 +697,7 @@ const AddMaterial = ({
 
   const checkMetaTitleUnique = (metaTitle: string) => {
     if (!metaTitle?.trim()) {
-      toast.error("Please enter a meta title first", { position: "top-center" });
+      toast.error("Please enter a meta title first");
       return;
     }
     checkMetaTitle({
@@ -718,7 +718,7 @@ const AddMaterial = ({
 
   const addOrUpdateFaq = () => {
     if (!currentFaq.question.trim() || !currentFaq.answer.trim()) {
-      toast.error("Both question and answer are required", { position: "top-center" });
+      toast.error("Both question and answer are required");
       return;
     }
     if (editingFaqIndex !== null) {
@@ -824,23 +824,23 @@ const AddMaterial = ({
           variables: { id: selectedData.id, input: cleanInputData },
         });
         if (result.data?.updateMaterial?.success) {
-          toast.success(result.data.updateMaterial.message || "Material updated successfully", { position: "top-center" });
+          toast.success(result.data.updateMaterial.message || "Material updated successfully");
         } else {
-          toast.error(result.data?.updateMaterial?.message || "Failed to update material", { position: "top-center" });
+          toast.error(result.data?.updateMaterial?.message || "Failed to update material");
         }
       } else {
         result = await createMaterial({ variables: { input: cleanInputData } });
         if (result.data?.createMaterial?.success) {
-          toast.success(result.data.createMaterial.message || "Material created successfully", { position: "top-center" });
+          toast.success(result.data.createMaterial.message || "Material created successfully");
         } else {
-          toast.error(result.data?.createMaterial?.message || "Failed to create material", { position: "top-center" });
+          toast.error(result.data?.createMaterial?.message || "Failed to create material");
         }
       }
       if (refetch) refetch();
       onCancel();
     } catch (error: any) {
       console.error("GraphQL Error:", error);
-      toast.error(error.message || "Operation failed", { position: "top-center" });
+      toast.error(error.message || "Operation failed");
     }
   };
 

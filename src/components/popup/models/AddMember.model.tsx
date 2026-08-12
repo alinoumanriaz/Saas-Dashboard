@@ -265,7 +265,7 @@ const AddMember: React.FC<AddMemberProps> = ({
         });
         if (response?.error) throw new Error(response.error.message);
         if (response?.data?.updateMember) {
-          toast.success("Member updated!", { position: "top-center" });
+          toast.success("Member updated!");
 
           refetch();
           onCancel();
@@ -276,7 +276,7 @@ const AddMember: React.FC<AddMemberProps> = ({
         });
         if (response?.error) throw new Error(response.error.message);
         if (response.data?.createMember) {
-          toast.success("Member created!", { position: "top-center" });
+          toast.success("Member created!");
           refetch();
           onCancel();
         }
@@ -284,9 +284,9 @@ const AddMember: React.FC<AddMemberProps> = ({
     } catch (error: any) {
       const msg = error.message || "An error occurred";
       if (/duplicate|already exists/i.test(msg)) {
-        toast.error(msg.includes("email") ? "Email already registered" : "Username already taken", { position: "top-center" });
+        toast.error(msg.includes("email") ? "Email already registered" : "Username already taken");
       } else {
-        toast.error(msg, { position: "top-center" });
+        toast.error(msg);
       }
     } finally {
       setLoading(false);

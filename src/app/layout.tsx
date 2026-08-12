@@ -10,7 +10,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { MantineProvider } from "@mantine/core";
 import '@mantine/core/styles.css';        // 👈 must be imported
 import '@mantine/tiptap/styles.css';      // 👈 must be imported
-import './globals.css'; 
+import './globals.css';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -37,12 +37,20 @@ export default function RootLayout({
             <ApolloWrapper>
               <ToastContainer />
               <MantineProvider>
-              {children}
+                {children}
               </MantineProvider>
             </ApolloWrapper>
           </Providers>
         </ThemeProvider>
-        <Toaster />
+        <Toaster
+          position="top-center"
+          className="my-toaster"
+          toastOptions={{
+            classNames: {
+              toast: "cn-toast my-toast-class",
+            },
+          }}
+        />
       </body>
     </html>
   );

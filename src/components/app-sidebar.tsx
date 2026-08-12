@@ -182,8 +182,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const orderedGroups = React.useMemo(() => {
     const order: Record<string, number> = {
-      modules: 0,
-      website: 1,
+      website: 0,
+      modules: 1,
       company: 2,
       app: 3,
     };

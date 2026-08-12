@@ -152,7 +152,7 @@ const AllCompaniesPage = () => {
     if (selectedIdsForDeletion.length === 0) return;
 
     if (!isSuperAdmin) {
-      toast.error("Access denied", { position: "top-center" });
+      toast.error("Access denied");
       return;
     }
 
@@ -162,21 +162,21 @@ const AllCompaniesPage = () => {
       });
 
       if (data?.deleteCompanies?.success) {
-        toast.success(data.deleteCompanies.message, { position: "top-center" });
+        toast.success(data.deleteCompanies.message);
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
       } else {
-        toast.error(data?.deleteCompanies?.message || "Failed to delete companies", { position: "top-center" });
+        toast.error(data?.deleteCompanies?.message || "Failed to delete companies");
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete companies", { position: "top-center" });
+      toast.error(err.message || "Failed to delete companies");
     }
   };
 
   const deleteHandler = async (ids: string[]) => {
     if (!isSuperAdmin) {
-      toast.error("Only super admins can delete companies", { position: "top-center" });
+      toast.error("Only super admins can delete companies");
       return;
     }
     setSelectedIdsForDeletion(ids);
@@ -185,11 +185,11 @@ const AllCompaniesPage = () => {
 
   const editHandler = (companyData: Company) => {
     if (!isSuperAdmin && !isOwner) {
-      toast.error("Only super admins, owners, and admins can edit companies", { position: "top-center" });
+      toast.error("Only super admins, owners, and admins can edit companies");
       return;
     }
     if (!isSuperAdmin && !companyData.ownerIds?.includes(currentCompanyMember?.id || "")) {
-      toast.error("You can only edit companies you own", { position: "top-center" });
+      toast.error("You can only edit companies you own");
       return;
     }
     setIsEditMode(true);
@@ -199,7 +199,7 @@ const AllCompaniesPage = () => {
 
   const addHandler = () => {
     if (!isSuperAdmin && !isOwner) {
-      toast.error("Only super admins, owners, and admins can add companies", { position: "top-center" });
+      toast.error("Only super admins, owners, and admins can add companies");
       return;
     }
     setSelectedData(null);

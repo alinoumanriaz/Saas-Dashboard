@@ -287,7 +287,7 @@ const AddModules = ({
       }
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Operation failed", { position: "top-center" });
+      toast.error(error.message || "Operation failed");
     }
   };
 

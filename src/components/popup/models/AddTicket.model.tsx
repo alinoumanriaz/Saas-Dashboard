@@ -224,7 +224,7 @@ const AddTicketModal: React.FC<AddTicketProps> = ({
                     },
                 });
                 if (response?.data?.updateTicket?.success) {
-                    toast.success("Ticket updated!", { position: "top-center" });
+                    toast.success("Ticket updated!");
                     refetch();
                     onCancel();
                 } else {
@@ -243,7 +243,7 @@ const AddTicketModal: React.FC<AddTicketProps> = ({
                     },
                 });
                 if (response?.data?.createTicket?.success) {
-                    toast.success("Ticket created!", { position: "top-center" });
+                    toast.success("Ticket created!");
                     refetch();
                     onCancel();
                 } else {

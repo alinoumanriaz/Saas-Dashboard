@@ -244,7 +244,7 @@ const Page = () => {
   const [updatePage, { loading: updating }] = useMutation<any>(UPDATE_PAGE, {
     onCompleted: (data) => {
       if (data.updatePage.success) {
-        toast.success("Page updated successfully", { position: "top-center" });
+        toast.success("Page updated successfully");
         setIsEditing(false);
         setIsDirty(false);
         setH1CheckStatus("idle");
@@ -252,11 +252,11 @@ const Page = () => {
         setMetaDescCheckStatus("idle");
         refetch();
       } else {
-        toast.error(data.updatePage.message || "Couldn't update the page", { position: "top-center" });
+        toast.error(data.updatePage.message || "Couldn't update the page");
       }
     },
     onError: (error) => {
-      toast.error(error.message || "Couldn't update the page", { position: "top-center" });
+      toast.error(error.message || "Couldn't update the page");
     },
   });
 
@@ -346,25 +346,25 @@ const Page = () => {
   };
 
   const handleSave = async () => {
-    if (!pageId) return toast.error("No page ID available", { position: "top-center" });
-    if (!currentcompanyMember?.id) return toast.error("You must be signed in to save changes", { position: "top-center" });
+    if (!pageId) return toast.error("No page ID available");
+    if (!currentcompanyMember?.id) return toast.error("You must be signed in to save changes");
 
     const h1InContent = checkH1InContent();
     if (!h1Tag.trim() && !h1InContent) {
-      return toast.warning("Add an H1 tag, either in the content or in the H1 field", { position: "top-center" });
+      return toast.warning("Add an H1 tag, either in the content or in the H1 field");
     }
     if (!metaTitle.trim()) {
-      return toast.warning("Meta title is required", { position: "top-center" });
+      return toast.warning("Meta title is required");
     }
     if (h1CheckStatus === "taken") {
-      return toast.warning("Choose a unique H1 tag before saving", { position: "top-center" });
+      return toast.warning("Choose a unique H1 tag before saving");
     }
     if (metaTitleCheckStatus === "taken") {
-      return toast.warning("Choose a unique meta title before saving", { position: "top-center" });
+      return toast.warning("Choose a unique meta title before saving");
     }
     const descStatus = checkMetaDescLength(metaDescription);
     if (descStatus === "long") {
-      return toast.warning("Meta description is too long (160 characters max)", { position: "top-center" });
+      return toast.warning("Meta description is too long (160 characters max)");
     }
 
     const inputData: any = {
@@ -393,7 +393,7 @@ const Page = () => {
   // ---------- Unique checks ----------
   const checkH1TagUnique = async () => {
     if (!h1Tag.trim()) {
-      toast.warning("Enter an H1 tag first", { position: "top-center" });
+      toast.warning("Enter an H1 tag first");
       return;
     }
     setH1CheckStatus("checking");
@@ -410,20 +410,20 @@ const Page = () => {
       });
       if (data?.checkUnique?.isUnique) {
         setH1CheckStatus("available");
-        toast.success("H1 tag is available", { position: "top-center" });
+        toast.success("H1 tag is available");
       } else {
         setH1CheckStatus("taken");
-        toast.warning("That H1 tag is already in use", { position: "top-center" });
+        toast.warning("That H1 tag is already in use");
       }
     } catch (err: any) {
       setH1CheckStatus("idle");
-      toast.error(err.message || "Couldn't check the H1 tag", { position: "top-center" });
+      toast.error(err.message || "Couldn't check the H1 tag");
     }
   };
 
   const checkMetaTitleUnique = async () => {
     if (!metaTitle.trim()) {
-      toast.warning("Enter a meta title first", { position: "top-center" });
+      toast.warning("Enter a meta title first");
       return;
     }
     setMetaTitleCheckStatus("checking");
@@ -440,27 +440,27 @@ const Page = () => {
       });
       if (data?.checkUnique?.isUnique) {
         setMetaTitleCheckStatus("available");
-        toast.success("Meta title is available", { position: "top-center" });
+        toast.success("Meta title is available");
       } else {
         setMetaTitleCheckStatus("taken");
-        toast.warning("That meta title is already in use", { position: "top-center" });
+        toast.warning("That meta title is already in use");
       }
     } catch (err: any) {
       setMetaTitleCheckStatus("idle");
-      toast.error(err.message || "Couldn't check the meta title", { position: "top-center" });
+      toast.error(err.message || "Couldn't check the meta title");
     }
   };
 
   const checkMetaDescriptionStatus = () => {
     const status = checkMetaDescLength(metaDescription);
     if (status === "empty") {
-      toast.info("Meta description is empty", { position: "top-center" });
+      toast.info("Meta description is empty");
       return;
     }
     setMetaDescCheckStatus(status);
-    if (status === "short") toast.warning("A little short — aim for 120–160 characters", { position: "top-center" });
-    else if (status === "long") toast.warning("Too long — keep it under 160 characters", { position: "top-center" });
-    else toast.success("Meta description length looks good", { position: "top-center" });
+    if (status === "short") toast.warning("A little short — aim for 120–160 characters");
+    else if (status === "long") toast.warning("Too long — keep it under 160 characters");
+    else toast.success("Meta description length looks good");
   };
 
   // ---------- Banner image gallery ----------

@@ -126,7 +126,7 @@ const CompanyWebsitesPage = () => {
 
   const handleAdd = () => {
     if (!canManage) {
-      toast.error("You don't have permission to add websites", { position: "top-center" });
+      toast.error("You don't have permission to add websites");
       return;
     }
     setEditingWebsite(null);
@@ -135,7 +135,7 @@ const CompanyWebsitesPage = () => {
 
   const handleEdit = (website: IWebsite) => {
     if (!canManage) {
-      toast.error("You don't have permission to edit websites", { position: "top-center" });
+      toast.error("You don't have permission to edit websites");
       return;
     }
     setEditingWebsite(website);
@@ -145,7 +145,7 @@ const CompanyWebsitesPage = () => {
   const handleDelete = async () => {
     if (selectedIds.length === 0) return;
     if (!canManage) {
-      toast.error("You don't have permission to delete websites", { position: "top-center" });
+      toast.error("You don't have permission to delete websites");
       return;
     }
     setIsDeleting(true);
@@ -154,15 +154,15 @@ const CompanyWebsitesPage = () => {
         variables: { ids: selectedIds },
       });
       if (data?.deleteWebsites?.success) {
-        toast.success(data.deleteWebsites.message, { position: "top-center" });
+        toast.success(data.deleteWebsites.message);
         setShowDeleteDialog(false);
         setSelectedIds([]);
         refetch();
       } else {
-        toast.error(data?.deleteWebsites?.message || "Failed to delete websites", { position: "top-center" });
+        toast.error(data?.deleteWebsites?.message || "Failed to delete websites");
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete websites", { position: "top-center" });
+      toast.error(err.message || "Failed to delete websites");
     } finally {
       setIsDeleting(false);
     }
@@ -170,7 +170,7 @@ const CompanyWebsitesPage = () => {
 
   const deleteHandler = (ids: string[]) => {
     if (!canManage) {
-      toast.error("You don't have permission to delete websites", { position: "top-center" });
+      toast.error("You don't have permission to delete websites");
       return;
     }
     setSelectedIds(ids);

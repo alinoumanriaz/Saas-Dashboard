@@ -214,3 +214,45 @@ td {
     @apply font-sans;
   }
 }
+
+
+/* Success
+.my-toast-class[data-type="success"] {
+  background: #ecfdf5 !important;
+  color: #065f46 !important;
+  border: 1px solid #10b981 !important;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25) !important;
+  padding: 0.5rem 1rem !important;
+}
+
+.my-toast-class[data-type="error"] {
+  background: #fef2f2 !important;
+  color: #991b1b !important;
+  border: 1px solid #ef4444 !important;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25) !important;
+  padding: 0.5rem 1rem !important;
+}
+
+.my-toast-class[data-type="warning"] {
+  background: #fffbeb !important;
+  color: #78350f !important;
+  border: 1px solid #f59e0b !important;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.25) !important;
+  padding: 0.5rem 1rem !important;
+  
+}
+
+.my-toast-class[data-type="info"] {
+  background: #eff6ff !important;
+  color: #1e3a8a !important;
+  border: 1px solid #3b82f6 !important;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25) !important;
+  padding: 0.5rem 1rem !important;
+}
+
+.my-toast-class[data-type="loading"] {
+  background: #f1f5f9 !important;
+  color: #1e293b !important;
+  border: 1px solid #94a3b8 !important;
+  padding: 0.5rem 1rem !important;
+} */

@@ -97,7 +97,7 @@ const Page = () => {
     if (selectedIdsForDeletion.length === 0) return;
 
     if (!canManage) {
-      toast.error("Access denied", { position: "top-center" });
+      toast.error("Access denied");
       setIsDeleting(false);
       return;
     }
@@ -108,7 +108,7 @@ const Page = () => {
       });
 
       if (data?.deleteCustomModules?.success) {
-        toast.success(data.deleteCustomModules.message, { position: "top-center" });
+        toast.success(data.deleteCustomModules.message);
         setShowConfirmationModel(false);
         refetch();
         setSelectedIdsForDeletion([]);
@@ -118,7 +118,7 @@ const Page = () => {
         });
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete modules", { position: "top-center" });
+      toast.error(err.message || "Failed to delete modules");
     } finally {
       setIsDeleting(false);
     }
@@ -131,7 +131,7 @@ const Page = () => {
 
   const editHandler = (moduleData: any) => {
     if (!canManage) {
-      toast.error("You don't have permission to edit modules", { position: "top-center" });
+      toast.error("You don't have permission to edit modules");
       return;
     }
     setIsEditMode(true);
@@ -179,7 +179,7 @@ const Page = () => {
         ...prev,
         [key]: !newValue,
       }));
-      toast.error(err.message || "Failed to update module", { position: "top-center" });
+      toast.error(err.message || "Failed to update module");
     } finally {
       setLoadingSwitches((prev) => ({ ...prev, [key]: false }));
     }

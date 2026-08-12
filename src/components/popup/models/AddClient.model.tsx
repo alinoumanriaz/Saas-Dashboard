@@ -67,7 +67,7 @@ interface AddClientProps {
 
 // ===================== Zod Schema =====================
 const addressSchema = z.object({
-  type: z.enum(["billing", "shipping", "office", "home", "other"]).default("other"),
+  type: z.enum(["BILLING", "SHIPPING", "OFFICE", "HOME", "OTHER"]).default("OTHER"),
   street: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -160,11 +160,11 @@ const ADDRESS_TYPE_META: Record<
   string,
   { label: string; icon: React.ReactNode }
 > = {
-  billing: { label: "Billing", icon: <BiStar className="w-4 h-4" /> },
-  shipping: { label: "Shipping", icon: <BiGlobe className="w-4 h-4" /> },
-  office: { label: "Office", icon: <BiBuilding className="w-4 h-4" /> },
-  home: { label: "Home", icon: <BiMap className="w-4 h-4" /> },
-  other: { label: "Other", icon: <BiMap className="w-4 h-4" /> },
+  BILLING: { label: "Billing", icon: <BiStar className="w-4 h-4" /> },
+  SHIPPING: { label: "Shipping", icon: <BiGlobe className="w-4 h-4" /> },
+  OFFICE: { label: "Office", icon: <BiBuilding className="w-4 h-4" /> },
+  HOME: { label: "Home", icon: <BiMap className="w-4 h-4" /> },
+  OTHER: { label: "Other", icon: <BiMap className="w-4 h-4" /> },
 };
 
 // ===================== Component =====================
@@ -221,7 +221,7 @@ const AddClient: React.FC<AddClientProps> = ({
     if (isEditMode && selectedData) {
       const addresses =
         selectedData.addresses?.map((addr: any) => ({
-          type: addr.type || "other",
+          type: addr.type || "OTHER",
           street: addr.street || "",
           city: addr.city || "",
           state: addr.state || "",
@@ -278,7 +278,7 @@ const AddClient: React.FC<AddClientProps> = ({
 
   const onInvalid = () => {
     jumpToFirstErrorTab();
-    toast.error("Please fix the highlighted fields", { position: "top-center" });
+    toast.error("Please fix the highlighted fields");
   };
 
   const onSubmit = async (data: ClientFormValues) => {
@@ -319,7 +319,7 @@ const AddClient: React.FC<AddClientProps> = ({
         });
         if (response?.error) throw new Error(response.error.message);
         if (response?.data?.updateClient?.success) {
-          toast.success("Client updated successfully", { position: "top-center" });
+          toast.success("Client updated successfully");
           refetch();
           onCancel();
         }
@@ -331,7 +331,7 @@ const AddClient: React.FC<AddClientProps> = ({
         if (response?.error) throw new Error(response.error.message);
 
         if (response?.data?.createClient?.success) {
-          toast.success("Client created successfully", { position: "top-center" });
+          toast.success("Client created successfully");
           refetch();
           onCancel();
         }
@@ -339,9 +339,9 @@ const AddClient: React.FC<AddClientProps> = ({
     } catch (error: any) {
       const msg = error.message || "An error occurred";
       if (/duplicate|already exists/i.test(msg)) {
-        toast.error("Email already registered", { position: "top-center" });
+        toast.error("Email already registered");
       } else {
-        toast.error(msg, { position: "top-center" });
+        toast.error(msg);
       }
     } finally {
       setLoading(false);
@@ -351,7 +351,7 @@ const AddClient: React.FC<AddClientProps> = ({
   // Add new empty address and jump straight to it
   const addAddress = () => {
     append({
-      type: "other",
+      type: "OTHER",
       street: "",
       city: "",
       state: "",
@@ -614,8 +614,8 @@ const AddClient: React.FC<AddClientProps> = ({
                   )}
 
                   {fields.map((field, index) => {
-                    const currentType = form.watch(`addresses.${index}.type`) || "other";
-                    const meta = ADDRESS_TYPE_META[currentType] ?? ADDRESS_TYPE_META.other;
+                    const currentType = form.watch(`addresses.${index}.type`) || "OTHER";
+                    const meta = ADDRESS_TYPE_META[currentType] ?? ADDRESS_TYPE_META.OTHER;
                     return (
                       <div
                         key={field.id}

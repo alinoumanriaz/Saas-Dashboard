@@ -148,7 +148,7 @@ const ClientsPage = () => {
 
   const handleAdd = () => {
     if (!canManage) {
-      toast.error("You don't have permission to add clients", { position: "top-center" });
+      toast.error("You don't have permission to add clients");
       return;
     }
     setEditingClient(null);
@@ -157,7 +157,7 @@ const ClientsPage = () => {
 
   const handleEdit = (client: IClient) => {
     if (!canManage) {
-      toast.error("You don't have permission to edit clients", { position: "top-center" });
+      toast.error("You don't have permission to edit clients");
       return;
     }
     setEditingClient(client);
@@ -167,7 +167,7 @@ const ClientsPage = () => {
   const handleDelete = async () => {
     if (selectedIds.length === 0) return;
     if (!canManage) {
-      toast.error("You don't have permission to delete clients", { position: "top-center" });
+      toast.error("You don't have permission to delete clients",);
       return;
     }
     setIsDeleting(true);
@@ -175,16 +175,18 @@ const ClientsPage = () => {
       const { data } = await deleteClients({
         variables: { ids: selectedIds },
       });
-      if (data?.deleteClients?.success) {
-        toast.success(data.deleteClients.message, { position: "top-center" });
+
+      console.log("Delete response:", data);
+      if (data?.removeClients?.success) {
+        toast.success(data.removeClients.message);
         setShowDeleteDialog(false);
         setSelectedIds([]);
         refetch();
       } else {
-        toast.error(data?.deleteClients?.message || "Failed to delete clients", { position: "top-center" });
+        toast.error(data?.removeClients?.message || "Failed to delete clients");
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete clients", { position: "top-center" });
+      toast.error(err.message || "Failed to delete clients");
     } finally {
       setIsDeleting(false);
     }
@@ -192,7 +194,7 @@ const ClientsPage = () => {
 
   const deleteHandler = (ids: string[]) => {
     if (!canManage) {
-      toast.error("You don't have permission to delete clients", { position: "top-center" });
+      toast.error("You don't have permission to delete clients");
       return;
     }
     setSelectedIds(ids);
