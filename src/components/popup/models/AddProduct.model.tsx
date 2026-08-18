@@ -355,13 +355,12 @@ const MetaTab = ({
           <div className="flex justify-between mt-1">
             <span className="text-sm text-gray-500">Recommended: 150-160 characters</span>
             <span
-              className={`text-sm ${
-                descLength > META_DESCRIPTION_MAX
+              className={`text-sm ${descLength > META_DESCRIPTION_MAX
                   ? "text-red-500"
                   : descLength > 150
-                  ? "text-yellow-500"
-                  : "text-green-500"
-              }`}
+                    ? "text-yellow-500"
+                    : "text-green-500"
+                }`}
             >
               {descLength}/{META_DESCRIPTION_MAX}
             </span>
@@ -906,9 +905,9 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
   const [checkMetaTitle, { loading: checkingMetaTitle, data: metaTitleData, error: metaTitleError }] =
     useLazyQuery<any>(CHECK_PRODUCT_META_TITLE_UNIQUE, { fetchPolicy: "network-only" });
 
-  const { data: industriesData, error: industriesError } = useQuery<any>(GET_INDUSTRIES);
-  const { data: materialsData, error: materialsError } = useQuery<any>(GET_MATERIALS);
-  const { data: stylesData, error: stylesError } = useQuery<any>(GET_STYLES);
+  const { data: industriesData, error: industriesError } = useQuery<any>(GET_INDUSTRIES, { fetchPolicy: "network-only" });
+  const { data: materialsData, error: materialsError } = useQuery<any>(GET_MATERIALS, { fetchPolicy: "network-only" });
+  const { data: stylesData, error: stylesError } = useQuery<any>(GET_STYLES, { fetchPolicy: "network-only" });
 
   useEffect(() => {
     if (slugData?.checkProductSlugUnique) {

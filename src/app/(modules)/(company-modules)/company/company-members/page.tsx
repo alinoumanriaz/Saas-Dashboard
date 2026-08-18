@@ -114,7 +114,7 @@ const CompanyMembersPage = () => {
     data?.getPaginatedCompanyMembers?.totalCompanyMembersCount || 0;
   const totalPages = Math.ceil(totalMembers / ITEMS_PER_PAGE);
 
-  console.log("Raw Members Data:", rawMembers);
+  // console.log("Raw Members Data:", rawMembers);
 
   const members = rawMembers.map((member) => ({
     ...member,
@@ -208,6 +208,7 @@ const CompanyMembersPage = () => {
       return;
     }
     setIsEditMode(true);
+    // console.log({ SelectedData: memberData })
     setSelectedData(memberData);
     setShowAddModel(true);
   };

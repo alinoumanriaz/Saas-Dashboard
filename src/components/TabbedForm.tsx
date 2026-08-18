@@ -224,18 +224,17 @@ function DynamicFormPopupInner<TFormValues extends Record<string, any>>({
     const body =
         tabs && tabs.length > 0 ? (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-gray-200 p-0">
+                <TabsList className="h-auto w-full justify-start gap-1 py-5.5 rounded-lg bg-gray-100 ">
                     {tabs.map((tab) => (
                         <TabsTrigger
                             key={tab.id}
                             value={tab.id}
                             disabled={tab.disabled}
                             className={cn(
-                                "group relative -mb-px rounded-none  border-transparent! bg-transparent! px-4 py-2.5",
+                                "group relative  -mb-px rounded-lg data-[state=active]:bg-white px-4 py-4.5",
                                 "font-medium text-sm text-gray-500 shadow-none! transition-colors duration-200",
                                 "hover:text-gray-800",
-                                "data-[state=active]:border-b-primary! data-[state=active]:bg-transparent!",
-                                "data-[state=active]:text-gray-900 data-[state=active]:shadow-none",
+                                "data-[state=active]:text-gray-900 data-[state=active]:shadow-2xs data-[state=active]:border-gray-200",
                                 "disabled:cursor-not-allowed disabled:text-gray-300"
                             )}
                         >
@@ -245,7 +244,7 @@ function DynamicFormPopupInner<TFormValues extends Record<string, any>>({
                                     className={cn(
                                         "ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none transition-colors duration-200",
                                         "bg-gray-100 text-gray-500",
-                                        "group-data-[state=active]:bg-primary group-data-[state=active]:text-primary"
+                                        "group-data-[state=active]:bg-primary group-data-[state=active]:text-white"
                                     )}
                                 >
                                     {tab.badge}

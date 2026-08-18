@@ -50,8 +50,9 @@ query GetPaginatedProducts(
         name
       }
       author {
-        id
-        
+        memberId {
+          username
+        }
       }
       faqs {
         question

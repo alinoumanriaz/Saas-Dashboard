@@ -30,6 +30,7 @@ interface IProduct {
   specification?: any;
   imageUrl: string | { url: string; alt?: string } | string[];
   status?: string;
+  author?: any;
   isFeatured?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -94,6 +95,9 @@ const Page = () => {
       notifyOnNetworkStatusChange: true,
     }
   );
+  console.log({ allProducts: data })
+
+  console.log({ productsError: error })
 
   const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
 
@@ -105,7 +109,7 @@ const Page = () => {
   const totalProducts = data?.getPaginatedProducts?.totalProducts || 0;
   const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
 
-  console.log({allProducts:data})
+
 
   // Map data to include `id` for TableBox compatibility
   const productsData = allProducts.map((product) => ({
@@ -219,7 +223,7 @@ const Page = () => {
   };
 
   // Table columns and custom renderers
-  const columns = ["image", "name", "slug", "h1Tag", "metaTitle", "metaDescription", "description", "status", "isFeatured", "createdAt", "updatedAt"];
+  const columns = ["image", "name", "slug", "h1Tag", "metaTitle", "metaDescription", "description", "status", "author", "isFeatured", "createdAt", "updatedAt"];
 
   const customRenderers = {
     image: (value: string, row: any) => (
@@ -263,20 +267,23 @@ const Page = () => {
     ),
     status: (value: string) => (
       <span
-        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          value === "published"
-            ? "bg-green-100 text-green-700"
-            : "bg-yellow-100 text-yellow-700"
-        }`}
+        className={`px-2 py-0.5 rounded-full text-xs font-medium ${value === "published"
+          ? "bg-green-100 text-green-700"
+          : "bg-yellow-100 text-yellow-700"
+          }`}
       >
         {value || "draft"}
       </span>
     ),
+    author: (value: string, row: any) => (
+      <div className="max-w-37.5 truncate">
+        {row.author?.memberId?.username || "—"}
+      </div>
+    ),
     isFeatured: (value: boolean) => (
       <span
-        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          value ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
-        }`}
+        className={`px-2 py-0.5 rounded-full text-xs font-medium ${value ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+          }`}
       >
         {value ? "Featured" : "No"}
       </span>
@@ -344,9 +351,8 @@ const Page = () => {
           onCancel={cancelDelete}
           onDelete={confirmDelete}
           title="Delete Products"
-          message={`Are you sure you want to delete ${selectedIdsForDeletion.length} product${
-            selectedIdsForDeletion.length === 1 ? "" : "s"
-          }? This action cannot be undone.`}
+          message={`Are you sure you want to delete ${selectedIdsForDeletion.length} product${selectedIdsForDeletion.length === 1 ? "" : "s"
+            }? This action cannot be undone.`}
           confirmText="Delete"
           cancelText="Cancel"
           loading={isDeleting}
