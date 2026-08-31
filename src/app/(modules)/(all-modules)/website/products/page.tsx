@@ -137,7 +137,7 @@ const Page = () => {
       type: "select",
       label: "Status",
       options: [
-        { value: "", label: "All Statuses" },
+        { value: "all", label: "All Statuses" },
         { value: "published", label: "Published" },
         { value: "draft", label: "Draft" },
       ],
@@ -147,7 +147,7 @@ const Page = () => {
       type: "select",
       label: "Featured",
       options: [
-        { value: "", label: "All" },
+        { value: "all", label: "All" },
         { value: "true", label: "Featured" },
         { value: "false", label: "Not Featured" },
       ],
