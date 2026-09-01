@@ -262,24 +262,53 @@ export function DataListPage({
                         return (
                           <div key={filter.key} className="space-y-2 w-40">
                             {filter.label && (
-                              <label className="text-sm font-medium">{filter.label}</label>
+                              <label className="text-sm font-medium">
+                                {filter.label}
+                              </label>
                             )}
+
                             <Select
-                              value={value === undefined ? "all" : String(value)}
-                              onValueChange={(val) =>
-                                onFilterChange(filter.key, val === "all" ? undefined : val)
+                              value={
+                                value === undefined ||
+                                  value === null ||
+                                  value === ""
+                                  ? "all"
+                                  : String(value)
                               }
+                              onValueChange={(val) => {
+                                onFilterChange(
+                                  filter.key,
+                                  val === "all" ? undefined : val
+                                );
+                              }}
                             >
                               <SelectTrigger className="w-full bg-white">
-                                <SelectValue placeholder={filter.placeholder || "All"} />
+                                <SelectValue
+                                  placeholder={filter.placeholder || "All"}
+                                />
                               </SelectTrigger>
+
                               <SelectContent>
-                                <SelectItem value="all">All</SelectItem>
-                                {filter.options?.map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
+                                {/* Default option */}
+                                <SelectItem value="all">
+                                  All
+                                </SelectItem>
+
+                                {/* User-defined options */}
+                                {filter.options
+                                  ?.filter(
+                                    (opt) =>
+                                      opt.value !== "" &&
+                                      opt.value !== "all"
+                                  )
+                                  .map((opt) => (
+                                    <SelectItem
+                                      key={opt.value}
+                                      value={opt.value}
+                                    >
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
                               </SelectContent>
                             </Select>
                           </div>
