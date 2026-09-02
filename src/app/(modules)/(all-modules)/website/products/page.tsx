@@ -99,7 +99,8 @@ const Page = () => {
 
   console.log({ productsError: error })
 
-  const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
+  // const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
+  const showTableLoading = loading || !currentWebsiteId;
 
   // Delete mutation
   const [deleteProducts] = useMutation<any>(DELETE_PRODUCTS);
@@ -138,8 +139,8 @@ const Page = () => {
       label: "Status",
       options: [
         { value: "", label: "All Statuses" },
-        { value: "published", label: "Published" },
-        { value: "draft", label: "Draft" },
+        { value: "PUBLISHED", label: "Published" },
+        { value: "DRAFT", label: "Draft" },
       ],
     },
     {
@@ -267,12 +268,12 @@ const Page = () => {
     ),
     status: (value: string) => (
       <span
-        className={`px-2 py-0.5 rounded-full text-xs font-medium ${value === "published"
+        className={`px-2 py-0.5 rounded-full text-xs font-medium ${value === "PUBLISHED"
           ? "bg-green-100 text-green-700"
           : "bg-yellow-100 text-yellow-700"
           }`}
       >
-        {value || "draft"}
+        {value || "DRAFT"}
       </span>
     ),
     author: (value: string, row: any) => (
@@ -321,7 +322,10 @@ const Page = () => {
         } else if (key === "status") {
           dispatch({ type: "SET_STATUS", payload: value || undefined });
         } else if (key === "isFeatured") {
-          const val = value === "" ? undefined : value === "true";
+          const val =
+            value === undefined || value === null || value === ""
+              ? undefined
+              : value === true || value === "true";
           dispatch({ type: "SET_FEATURED", payload: val });
         }
       }}
