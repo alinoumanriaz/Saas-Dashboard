@@ -9,6 +9,8 @@ export async function GET(req: Request) {
     const cloudName = searchParams.get("cloudName") || process.env.CLOUDINARY_CLOUD_NAME;
     const cloudinaryApiKey = searchParams.get("cloudinaryApiKey") || process.env.CLOUDINARY_API_KEY;
     const cloudinaryApiKeySecret = searchParams.get("cloudinaryApiKeySecret") || process.env.CLOUDINARY_API_SECRET;
+
+
     if (!folder)
       return NextResponse.json(
         { error: "Folder name is required" },
@@ -47,6 +49,7 @@ export async function DELETE(req: Request) {
   try {
     const body = await req.json();
     const { public_ids, folder } = body;
+
 
     if (!Array.isArray(public_ids) || public_ids.length === 0) {
       return NextResponse.json(

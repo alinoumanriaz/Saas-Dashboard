@@ -80,14 +80,14 @@ const WebsiteGalleryModel = ({
     folderName = "dbManagementDashboard",   // fallback
     cloudinaryName = "dj5dbawzz",           // fallback
     cloudinaryNameApiKey,
-    cloudinaryNameApiSecret,
+    cloudinaryNameApiKeySecret,
   } = cloudinaryConfig || {};
 
   // These will be used throughout the component
   const FOLDER = folderName;
   const CLOUD_NAME = cloudinaryName;
   const CLOUDINARY_API_KEY = cloudinaryNameApiKey;
-  const CLOUDINARY_API_SECRET = cloudinaryNameApiSecret;
+  const CLOUDINARY_API_SECRET = cloudinaryNameApiKeySecret;
 
   // ------------------------------------------------------------
   // State

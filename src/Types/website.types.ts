@@ -14,7 +14,7 @@ export interface CloudinaryConfig {
   folderName: string;
   cloudinaryName: string;
   cloudinaryNameApiKey: string;
-  cloudinaryNameApiSecret: string;
+  cloudinaryNameApiKeySecret: string;
 }
 
 export interface Website {
