@@ -4,15 +4,14 @@ import ApolloWrapper from "@/helpers/ApolloProvider";
 import { ToastContainer } from "react-toastify";
 import { Providers } from "@/redux/providers";
 import { cn } from "@/lib/utils";
-import { Geist } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { MantineProvider } from "@mantine/core";
 import '@mantine/core/styles.css';        // 👈 must be imported
 import '@mantine/tiptap/styles.css';      // 👈 must be imported
 import './globals.css';
+import { mainFont } from "@/lib/fonts";
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -25,8 +24,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
-      <body className="antialiased overflow-x-hidden bg-gray-100">
+    <html lang="en" className={`${mainFont.variable}`} suppressHydrationWarning>
+      <body className="antialiased overflow-x-hidden">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

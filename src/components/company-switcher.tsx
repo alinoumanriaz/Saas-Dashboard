@@ -27,9 +27,9 @@ export function CompanySwitcher({
 }: {
   companyMembers: any[]
 }) {
-  const dispatch = useAppDispatch();
   const { isMobile } = useSidebar()
   const [activeCompany, setActiveCompany] = React.useState<any>(companyMembers[0])
+  const dispatch = useAppDispatch();
 
   React.useEffect(() => {
     if (companyMembers?.length) {
@@ -51,12 +51,12 @@ export function CompanySwitcher({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              {/* <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage className="rounded-lg!" src={activeCompany?.companyId?.logo} alt={activeCompany?.companyId?.name} />
                   <AvatarFallback className="ring-1 ring-gray-300">{getInitials(activeCompany?.companyId?.name)}</AvatarFallback>
                 </Avatar>
-              </div>
+              </div> */}
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{activeCompany?.companyId?.name}</span>
                 <span className="truncate text-xs">{activeCompany?.role}</span>

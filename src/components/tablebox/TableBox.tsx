@@ -179,12 +179,12 @@ const TableBox = ({
         </div>
       )}
 
-      <div className="flex-1 overflow-hidden rounded-lg border border-border">
+      <div className="flex-1 overflow-hidden  custom-white-box">
           <Table className="w-full " tableHeight={height}>
-            <TableHeader className="sticky top-0 z-20 bg-white backdrop-blur-sm">
-              <TableRow className="hover:bg-transparent">
+            <TableHeader className="sticky top-0 z-20 bg-white">
+              <TableRow className="hover:bg-transparent text-sm uppercase">
                 {checkbox && (
-                  <TableHead className="sticky left-0 z-30  backdrop-blur-sm min-w-9">
+                  <TableHead className="sticky left-0 z-30 min-w-9">
                     <Checkbox
                       checked={
                         selectedIds.length > 0 &&
@@ -206,7 +206,7 @@ const TableBox = ({
                     className="cursor-pointer"
                     onClick={() => handleSort(col)}
                   >
-                    <div className="flex items-center gap-2 capitalize">
+                    <div className="flex items-center gap-2">
                       <span>{col.replace(/([A-Z])/g, " $1").trim()}</span>
                       <RxCaretSort className="size-4" />
                     </div>

@@ -157,6 +157,7 @@ function MenuItem({ item, level = 0 }: MenuItemProps) {
           <SidebarMenuSubButton
             asChild
             isActive={isActive}
+            // className={`flex items-center justify-center active:bg-transparent hover:bg-transparent data-active:bg-transparent hover:text-sidebar-accent-foreground`}
           >
             <Link href={item.moduleId.route}>
               <span>{item.moduleId.moduleName}</span>

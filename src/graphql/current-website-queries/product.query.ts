@@ -62,6 +62,7 @@ query GetPaginatedProducts(
       tags
       lowPrice
       highPrice
+      moq
       createdAt
       updatedAt
     }
@@ -194,7 +195,7 @@ query GetProductBySlug($slug: String!) {
 `;
 
 export const CHECK_PRODUCT_SLUG_UNIQUE = gql`
-query CheckProductSlugUnique($slug: String!, $excludeId: ID) {
+query CheckProductSlugUnique($slug: String!, $excludeId: String) {
   checkProductSlugUnique(slug: $slug, excludeId: $excludeId) {
     success
     isUnique
@@ -204,7 +205,7 @@ query CheckProductSlugUnique($slug: String!, $excludeId: ID) {
 `;
 
 export const CHECK_PRODUCT_H1_TAG_UNIQUE = gql`
-query CheckProductH1TagUnique($h1Tag: String!, $excludeId: ID) {
+query CheckProductH1TagUnique($h1Tag: String!, $excludeId: String) {
   checkProductH1TagUnique(h1Tag: $h1Tag, excludeId: $excludeId) {
     success
     isUnique
@@ -214,7 +215,7 @@ query CheckProductH1TagUnique($h1Tag: String!, $excludeId: ID) {
 `;
 
 export const CHECK_PRODUCT_META_TITLE_UNIQUE = gql`
-query CheckProductMetaTitleUnique($metaTitle: String!, $excludeId: ID) {
+query CheckProductMetaTitleUnique($metaTitle: String!, $excludeId: String) {
   checkProductMetaTitleUnique(metaTitle: $metaTitle, excludeId: $excludeId) {
     success
     isUnique

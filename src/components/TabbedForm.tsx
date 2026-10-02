@@ -10,7 +10,6 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ZodSchema } from "zod";
-
 import {
     Dialog,
     DialogContent,
@@ -21,29 +20,27 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Check, ChevronRight, Circle, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
-/*  Types                                                             */
+/* Types                                                              */
 /* ------------------------------------------------------------------ */
-
-/** One tab: an id, a label shown on the tab trigger, and its content. */
 export interface TabConfig {
     id: string;
     label: string;
+    badge?: string | number;
     content: ReactNode;
     disabled?: boolean;
-    /** Optional small badge/count shown next to the label, e.g. FAQs (3) */
-    badge?: string | number;
+    icon?: React.ComponentType<{ className?: string }>;
+    iconClassName?: string;
+    iconBgClassName?: string;
 }
 
-/** A single footer button. Fully caller-defined so any page can wire up
- * whatever actions it needs (Cancel, Save Draft, Publish, Delete, etc). */
 export interface DynamicButtonConfig {
     id: string;
     label: string;
-    /** Defaults to "button". Use "submit" to trigger the form's onSubmit/validation. */
     type?: "button" | "submit";
     variant?:
     | "default"
@@ -65,56 +62,40 @@ const SIZE_CLASSES: Record<PopupSize, string> = {
     sm: "sm:max-w-md",
     md: "sm:max-w-xl",
     lg: "sm:max-w-2xl",
-    xl: "sm:max-w-4xl",
-    "2xl": "sm:max-w-6xl",
-    full: "sm:max-w-[95vw] h-[90vh]",
+    xl: "sm:max-w-5xl",
+    "2xl": "sm:max-w-7xl",
+    full: "sm:max-w-[96vw] h-[94vh]",
 };
 
 interface DynamicFormPopupProps<TFormValues extends Record<string, any>> {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-
-    /** Dynamic heading content */
     title: ReactNode;
     subtitle?: ReactNode;
-
-    /** Dynamic tabs. If omitted, `children` is rendered instead (no tab bar). */
     tabs?: TabConfig[];
     children?: ReactNode;
-    /** Controlled active tab (optional — component manages its own state if omitted) */
     activeTab?: string;
     onActiveTabChange?: (tabId: string) => void;
     defaultActiveTab?: string;
-
-    /** react-hook-form setup */
     defaultValues: DefaultValues<TFormValues>;
     validationSchema?: ZodSchema<TFormValues>;
     onSubmit: SubmitHandler<TFormValues>;
     mode?: "onBlur" | "onChange" | "onSubmit" | "onTouched" | "all";
-
-    /**
-     * Dynamic footer buttons. If provided, this fully replaces the default
-     * Cancel / Submit pair — build any combination of actions you need.
-     * If omitted, a default Cancel + Submit button pair is rendered using
-     * `cancelLabel` / `submitLabel` / `isSubmitting`.
-     */
     buttons?: DynamicButtonConfig[];
     submitLabel?: string;
     cancelLabel?: string;
     isSubmitting?: boolean;
-    /** Hide the footer entirely (e.g. for read-only/preview popups) */
     hideFooter?: boolean;
-
     size?: PopupSize;
     className?: string;
-    /** Disable closing on outside click / escape (useful mid-submit) */
     preventClose?: boolean;
+    /** Optional right-hand sidebar rendered next to the scrollable body */
+    sidebar?: ReactNode;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Component                                                         */
+/* Component                                                          */
 /* ------------------------------------------------------------------ */
-
 function DynamicFormPopupInner<TFormValues extends Record<string, any>>({
     open,
     onOpenChange,
@@ -137,17 +118,18 @@ function DynamicFormPopupInner<TFormValues extends Record<string, any>>({
     size = "lg",
     className,
     preventClose = false,
+    sidebar,
 }: DynamicFormPopupProps<TFormValues>) {
     const methods = useForm<TFormValues>({
         defaultValues,
-        resolver: validationSchema ? zodResolver(validationSchema as any) as Resolver<TFormValues> : undefined,
+        resolver: validationSchema
+            ? (zodResolver(validationSchema as any) as Resolver<TFormValues>)
+            : undefined,
         mode,
     });
 
     const { handleSubmit, reset } = methods;
 
-    // Re-hydrate the form whenever the popup is reopened with new defaults
-    // (e.g. switching from "Add" to "Edit" on a different row).
     useEffect(() => {
         if (open) {
             reset(defaultValues);
@@ -166,78 +148,174 @@ function DynamicFormPopupInner<TFormValues extends Record<string, any>>({
         onOpenChange(next);
     };
 
+    const currentTabIndex = tabs?.findIndex((tab) => tab.id === activeTab);
+
     const renderFooter = () => {
         if (hideFooter) return null;
 
         if (buttons && buttons.length > 0) {
             return (
-                <DialogFooter className="gap-2.5 border-t border-gray-100 px-6 py-4 sm:gap-2.5">
-                    {buttons
-                        .filter((btn) => !btn.hidden)
-                        .map((btn) => (
-                            <Button
-                                key={btn.id}
-                                type={btn.type ?? "button"}
-                                variant={btn.variant ?? "outline"}
-                                disabled={btn.disabled || btn.loading}
-                                onClick={btn.type === "submit" ? undefined : btn.onClick}
-                                className={cn(
-                                    "min-w-24 rounded-lg font-medium transition-all duration-150 active:scale-[0.98]",
-                                    btn.variant === "default" &&
-                                    "bg-primary shadow-sm hover:bg-primary hover:shadow-md",
-                                    (!btn.variant || btn.variant === "outline") &&
-                                    "border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50",
-                                    btn.className
-                                )}
-                            >
-                                {btn.loading && <Loader2 className="mr-2 size-4 animate-spin" />}
-                                {btn.label}
-                            </Button>
-                        ))}
+                <DialogFooter
+                    className="
+                        flex
+                        flex-col-reverse
+                        gap-3
+                        border-t
+                        border-slate-200
+                        bg-white/95
+                        px-6
+                        py-4
+                        backdrop-blur-xl
+                        sm:flex-row
+                        sm:items-center
+                        sm:justify-between
+                    "
+                >
+                    <div className="text-xs text-slate-400">
+                        {isSubmitting
+                            ? "Saving your changes..."
+                            : "All changes are validated before saving."}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {buttons
+                            .filter((btn) => !btn.hidden)
+                            .map((btn) => (
+                                <Button
+                                    key={btn.id}
+                                    type={btn.type ?? "button"}
+                                    variant={btn.variant ?? "outline"}
+                                    disabled={btn.disabled || btn.loading}
+                                    onClick={
+                                        btn.type === "submit"
+                                            ? undefined
+                                            : btn.onClick
+                                    }
+                                    className={cn(
+                                        "h-10 rounded-xl px-5 font-semibold transition-all",
+                                        "active:scale-[0.98]",
+                                        btn.variant === "default" &&
+                                        "bg-[#1a3260] text-white shadow-sm hover:bg-[#14284d] hover:shadow-md",
+                                        (!btn.variant ||
+                                            btn.variant === "outline") &&
+                                        "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
+                                        btn.className
+                                    )}
+                                >
+                                    {btn.loading && (
+                                        <Loader2 className="mr-2 size-4 animate-spin" />
+                                    )}
+                                    {btn.label}
+                                </Button>
+                            ))}
+                    </div>
                 </DialogFooter>
             );
         }
 
         return (
-            <DialogFooter className="gap-2.5 border-t border-gray-100 px-6 py-4 sm:gap-2.5">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleOpenChange(false)}
-                    disabled={isSubmitting}
-                    className="rounded-lg border-gray-200 font-medium text-gray-700 transition-all duration-150 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98]"
-                >
-                    {cancelLabel}
-                </Button>
-                <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="min-w-28 rounded-lg bg-primary font-medium shadow-sm transition-all duration-150 hover:bg-primary hover:shadow-md active:scale-[0.98]"
-                >
-                    {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-                    {submitLabel}
-                </Button>
+            <DialogFooter
+                className="
+                    flex
+                    flex-col-reverse
+                    gap-3
+                    border-t
+                    border-slate-200
+                    bg-white/95
+                    px-6
+                    py-4
+                    backdrop-blur-xl
+                    sm:flex-row
+                    sm:items-center
+                    sm:justify-between
+                "
+            >
+                <div className="text-xs text-slate-400">
+                    {isSubmitting
+                        ? "Saving your changes..."
+                        : "Make sure all required information is complete."}
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleOpenChange(false)}
+                        disabled={isSubmitting}
+                        className="
+                            h-10
+                            rounded-xl
+                            border-slate-200
+                            bg-white
+                            px-5
+                            font-semibold
+                            text-slate-700
+                            hover:bg-slate-50
+                        "
+                    >
+                        {cancelLabel}
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="
+                            h-10
+                            min-w-32
+                            rounded-xl
+                            bg-[#1a3260]
+                            px-6
+                            font-semibold
+                            text-white
+                            shadow-sm
+                            hover:bg-[#14284d]
+                            hover:shadow-md
+                        "
+                    >
+                        {isSubmitting && (
+                            <Loader2 className="mr-2 size-4 animate-spin" />
+                        )}
+                        {submitLabel}
+                    </Button>
+                </div>
             </DialogFooter>
         );
     };
 
     const body =
         tabs && tabs.length > 0 ? (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="h-auto w-full justify-start gap-1 py-5.5 rounded-lg bg-gray-100 ">
+            <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="flex w-full flex-col"
+            >
+                <TabsList className="h-auto w-full border border-gray-200 justify-start gap-1 py-5.5 rounded-lg bg-primary/5 scrollbar-none">
                     {tabs.map((tab) => (
                         <TabsTrigger
                             key={tab.id}
                             value={tab.id}
                             disabled={tab.disabled}
                             className={cn(
-                                "group relative  -mb-px rounded-lg data-[state=active]:bg-white px-4 py-4.5",
-                                "font-medium text-sm text-gray-500 shadow-none! transition-colors duration-200",
-                                "hover:text-gray-800",
-                                "data-[state=active]:text-gray-900 data-[state=active]:shadow-2xs data-[state=active]:border-gray-200",
-                                "disabled:cursor-not-allowed disabled:text-gray-300"
+                                "group relative flex items-center gap-1.5",
+                                "rounded-lg border border-transparent",
+                                "px-4 py-4.5",
+                                "text-sm font-medium text-gray-500",
+                                "transition-all duration-200 ease-out",
+                                "hover:-translate-y-px hover:bg-white/70 hover:text-gray-900",
+                                "hover:shadow-sm",
+                                "data-[state=active]:bg-white",
+                                "data-[state=active]:text-primary",
+                                "active:scale-[0.98]",
+                                "disabled:pointer-events-none",
+                                "disabled:cursor-not-allowed",
+                                "disabled:opacity-40"
                             )}
                         >
+                            {tab.icon && (
+                                <tab.icon
+                                    className={cn(
+                                        "mr-1 size-4",
+                                        tab.iconClassName
+                                    )}
+                                />
+                            )}
                             {tab.label}
                             {tab.badge !== undefined && (
                                 <span
@@ -254,15 +332,17 @@ function DynamicFormPopupInner<TFormValues extends Record<string, any>>({
                     ))}
                 </TabsList>
 
-                {tabs.map((tab) => (
-                    <TabsContent
-                        key={tab.id}
-                        value={tab.id}
-                        className="mt-5 focus-visible:outline-none data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:duration-200"
-                    >
-                        {tab.content}
-                    </TabsContent>
-                ))}
+                <div className="min-h-0">
+                    {tabs.map((tab) => (
+                        <TabsContent
+                            key={tab.id}
+                            value={tab.id}
+                            className="mt-3 outline-none data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:duration-200"
+                        >
+                            {tab.content}
+                        </TabsContent>
+                    ))}
+                </div>
             </Tabs>
         ) : (
             children
@@ -273,29 +353,69 @@ function DynamicFormPopupInner<TFormValues extends Record<string, any>>({
             <DialogContent
                 className={cn(
                     SIZE_CLASSES[size],
-                    "flex flex-col gap-0 overflow-hidden rounded-xl border-none! p-0",
+                    `
+                        flex
+                        max-h-[94vh]
+                        flex-col
+                        gap-0
+                        overflow-hidden
+                        rounded-2xl
+                        border
+                        border-slate-200
+                        bg-slate-50
+                        p-0
+                        shadow-2xl
+                    `,
                     className
                 )}
-                onInteractOutside={(e) => preventClose && e.preventDefault()}
-                onEscapeKeyDown={(e) => preventClose && e.preventDefault()}
+                onInteractOutside={(event) => {
+                    if (preventClose) event.preventDefault();
+                }}
+                onEscapeKeyDown={(event) => {
+                    if (preventClose) event.preventDefault();
+                }}
             >
-                <DialogHeader className="space-y-1 border-b border-gray-100 px-6 py-5">
-                    <DialogTitle className="text-lg font-semibold tracking-tight text-gray-900">
-                        {title}
-                    </DialogTitle>
-                    {subtitle && (
-                        <DialogDescription className="text-sm text-gray-500">
-                            {subtitle}
-                        </DialogDescription>
-                    )}
+                {/* Header */}
+                <DialogHeader className="shrink-0 border-b border-slate-200 bg-white/95 px-6 py-5 backdrop-blur-xl sm:px-7">
+                    <div className="flex items-start justify-between gap-5">
+                        <div className="flex justify-center items-center gap-2">
+                            <div className="p-1.5 bg-primary rounded-lg text-white">
+                                <Plus />
+                            </div>
+                            <div className="min-w-0">
+                                <DialogTitle className="text-xl font-bold tracking-tight text-slate-950">
+                                    {title}
+                                </DialogTitle>
+                                {subtitle && (
+                                    <DialogDescription className="text-sm leading-5 text-slate-500">
+                                        {subtitle}
+                                    </DialogDescription>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </DialogHeader>
 
+                {/* Form */}
                 <FormProvider {...methods}>
                     <form
                         onSubmit={handleSubmit(onSubmit)}
-                        className="flex flex-1 flex-col overflow-hidden"
+                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
                     >
-                        <div className="flex-1 overflow-y-auto px-6 py-1">{body}</div>
+                        <div className="flex min-h-0 flex-1 overflow-hidden">
+                            {/* Main scrollable content */}
+                            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 sm:px-5">
+                                {body}
+                            </div>
+
+                            {/* Right sidebar */}
+                            {sidebar && (
+                                <aside className="hidden w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-slate-50/50 p-4 lg:block">
+                                    {sidebar}
+                                </aside>
+                            )}
+                        </div>
+
                         {renderFooter()}
                     </form>
                 </FormProvider>

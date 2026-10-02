@@ -232,185 +232,185 @@ export function DataListPage({
             </div>
           )}
 
-          <div className="flex justify-between items-center ">
+          <div>
+            <div className="flex justify-between items-center">
 
-            {/* Filter Bar */}
-            {showFilters && filterConfig.length > 0 && (
-              <div className="w-full mb-4">
-                <div className="w-full flex justify-start items-center gap-2 flex-wrap">
-                  {filterConfig.map((filter) => {
-                    const value = filterValues[filter.key];
-                    switch (filter.type) {
-                      case "search":
-                        return (
-                          <div key={filter.key} className="space-y-2 min-w-50">
-                            {filter.label && (
-                              <label className="text-sm font-medium">{filter.label}</label>
-                            )}
-                            <div className="relative">
-                              <BiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                placeholder={filter.placeholder || "Search..."}
-                                className="pl-9 bg-white"
-                                value={value || ""}
-                                onChange={(e) => onFilterChange(filter.key, e.target.value)}
-                              />
-                            </div>
-                          </div>
-                        );
-                      case "select":
-                        return (
-                          <div key={filter.key} className="space-y-2 w-40">
-                            {filter.label && (
-                              <label className="text-sm font-medium">
-                                {filter.label}
-                              </label>
-                            )}
-
-                            <Select
-                              value={
-                                value === undefined ||
-                                  value === null ||
-                                  value === ""
-                                  ? "all"
-                                  : String(value)
-                              }
-                              onValueChange={(val) => {
-                                onFilterChange(
-                                  filter.key,
-                                  val === "all" ? undefined : val
-                                );
-                              }}
-                            >
-                              <SelectTrigger className="w-full bg-white">
-                                <SelectValue
-                                  placeholder={filter.placeholder || "All"}
+              {/* Filter Bar */}
+              {showFilters && filterConfig.length > 0 && (
+                <div className="w-full mb-2">
+                  <div className="w-full flex justify-start items-center gap-2 flex-wrap">
+                    {filterConfig.map((filter) => {
+                      const value = filterValues[filter.key];
+                      switch (filter.type) {
+                        case "search":
+                          return (
+                            <div key={filter.key} className="space-y-2 min-w-50">
+                              {/* {filter.label && (
+                                <label className="text-sm font-medium">{filter.label}</label>
+                              )} */}
+                              <div className="relative">
+                                <BiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  placeholder={filter.placeholder || "Search..."}
+                                  className="pl-9 bg-white"
+                                  value={value || ""}
+                                  onChange={(e) => onFilterChange(filter.key, e.target.value)}
                                 />
-                              </SelectTrigger>
+                              </div>
+                            </div>
+                          );
+                        case "select":
+                          return (
+                            <div key={filter.key} className="space-y-2 w-40">
+                              {/* {filter.label && (
+                                <label className="text-sm font-medium">
+                                  {filter.label}
+                                </label>
+                              )} */}
 
-                              <SelectContent>
-                                {/* Default option */}
-                                <SelectItem value="all">
-                                  All
-                                </SelectItem>
+                              <Select
+                                value={
+                                  value === undefined ||
+                                    value === null ||
+                                    value === ""
+                                    ? "all"
+                                    : String(value)
+                                }
+                                onValueChange={(val) => {
+                                  onFilterChange(
+                                    filter.key,
+                                    val === "all" ? undefined : val
+                                  );
+                                }}
+                              >
+                                <SelectTrigger className="w-full bg-white">
+                                  <SelectValue
+                                    placeholder={filter.placeholder || "All Status"}
+                                  />
+                                </SelectTrigger>
 
-                                {/* User-defined options */}
-                                {filter.options
-                                  ?.filter(
-                                    (opt) =>
-                                      opt.value !== "" &&
-                                      opt.value !== "all"
+                                <SelectContent>
+                                  {/* Default option */}
+                                  <SelectItem value="all">
+                                    All
+                                  </SelectItem>
+
+                                  {/* User-defined options */}
+                                  {filter.options
+                                    ?.filter(
+                                      (opt) =>
+                                        opt.value !== "" &&
+                                        opt.value !== "all"
+                                    )
+                                    .map((opt) => (
+                                      <SelectItem
+                                        key={opt.value}
+                                        value={opt.value}
+                                      >
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          );
+                        case "boolean":
+                          return (
+                            <div key={filter.key} className="space-y-2 w-40">
+                              {/* {filter.label && (
+                                <label className="text-sm font-medium">{filter.label}</label>
+                              )} */}
+                              <Select
+                                value={value === undefined ? "all" : String(value)}
+                                onValueChange={(val) =>
+                                  onFilterChange(
+                                    filter.key,
+                                    val === "all" ? undefined : val === "true"
                                   )
-                                  .map((opt) => (
-                                    <SelectItem
-                                      key={opt.value}
-                                      value={opt.value}
-                                    >
-                                      {opt.label}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        );
-                      case "boolean":
-                        return (
-                          <div key={filter.key} className="space-y-2 w-40">
-                            {filter.label && (
-                              <label className="text-sm font-medium">{filter.label}</label>
-                            )}
-                            <Select
-                              value={value === undefined ? "all" : String(value)}
-                              onValueChange={(val) =>
-                                onFilterChange(
-                                  filter.key,
-                                  val === "all" ? undefined : val === "true"
-                                )
-                              }
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder={filter.placeholder || "All"} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All</SelectItem>
-                                <SelectItem value="true">Yes</SelectItem>
-                                <SelectItem value="false">No</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        );
-                      default:
-                        return null;
-                    }
-                  })}
+                                }
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder={filter.placeholder || "All"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All</SelectItem>
+                                  <SelectItem value="true">Yes</SelectItem>
+                                  <SelectItem value="false">No</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          );
+                        default:
+                          return null;
+                      }
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {/* Active Filters Display */}
-            {activeFiltersCount > 0 && (
-              <div className="flex w-fit text-nowrap gap-2 items-end px-3 p-1">
-                {Object.entries(filterValues).map(([key, val]) => {
-                  if (val === undefined || val === "" || val === null) return null;
-                  const config = filterConfig.find((f) => f.key === key);
-                  if (!config) return null;
-                  const label = getFilterLabel(key, val);
-                  return (
-                    <span
-                      key={key}
-                      className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-100 text-blue-800"
-                    >
-                      {config.label || key}: {label}
-                      <button
-                        onClick={() => onFilterChange(key, undefined)}
-                        className="ml-2 hover:text-blue-600 font-bold"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  );
-                })}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onResetFilters}
-                  className="text-red-600 ml-auto hover:text-red-700"
-                >
-                  <FilterX className="size-4 mr-1" />
-                </Button>
-              </div>
-            )}
-
-          </div>
-
-
-
-          {/* Table or Error */}
-          {error ? (
-            <div className="p-4 text-red-500 bg-red-50 rounded-lg">
-              <div className="font-semibold">Error loading data</div>
-              <div className="text-sm mt-1">{error.message}</div>
-              {onRetry && (
-                <Button
-                  variant="destructive"
-                  onClick={onRetry}
-                  className="mt-3"
-                >
-                  Retry
-                </Button>
               )}
+
+              {/* Active Filters Display */}
+              {activeFiltersCount > 0 && (
+                <div className="flex w-fit text-nowrap gap-2 items-end px-3 p-1">
+                  {Object.entries(filterValues).map(([key, val]) => {
+                    if (val === undefined || val === "" || val === null) return null;
+                    const config = filterConfig.find((f) => f.key === key);
+                    if (!config) return null;
+                    const label = getFilterLabel(key, val);
+                    return (
+                      <span
+                        key={key}
+                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-100 text-blue-800"
+                      >
+                        {config.label || key}: {label}
+                        <button
+                          onClick={() => onFilterChange(key, undefined)}
+                          className="ml-2 hover:text-blue-600 font-bold"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onResetFilters}
+                    className="text-red-600 ml-auto hover:text-red-700"
+                  >
+                    <FilterX className="size-4 mr-1" />
+                  </Button>
+                </div>
+              )}
+
             </div>
-          ) : (
-            <TableBox
-              {...restTableConfig}   // spread all other config
-              column={column}        // ensure column is always defined
-              data={data}
-              loading={loading}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              setCurrentPage={setCurrentPage}
-            />
-          )}
+
+            {/* Table or Error */}
+            {error ? (
+              <div className="p-4 text-red-500 bg-red-50 rounded-lg">
+                <div className="font-semibold">Error loading data</div>
+                <div className="text-sm mt-1">{error.message}</div>
+                {onRetry && (
+                  <Button
+                    variant="destructive"
+                    onClick={onRetry}
+                    className="mt-3"
+                  >
+                    Retry
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <TableBox
+                {...restTableConfig}   // spread all other config
+                column={column}        // ensure column is always defined
+                data={data}
+                loading={loading}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                setCurrentPage={setCurrentPage}
+              />
+            )}
+          </div>
         </div>
       </div>
 

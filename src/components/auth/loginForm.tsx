@@ -79,7 +79,7 @@ const LoginForm = ({
         //   document.cookie = `auth-token=${data.loginMember.token}; path=/`;
         // }
 
-        router.push("/");
+        router.push("/company/company-details");
         router.refresh(); // Refresh server components
         setLoading(false);
       } else {
@@ -103,7 +103,7 @@ const LoginForm = ({
           </CardDescription>
 
         </CardHeader>
-        <FieldGroup>
+        {/* <FieldGroup>
           <Field>
             <Button className="py-5" variant="outline" type="button">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -124,11 +124,11 @@ const LoginForm = ({
               Login with Google
             </Button>
           </Field>
-        </FieldGroup>
+        </FieldGroup> */}
 
-        <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+        {/* <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
           Or continue with
-        </FieldSeparator>
+        </FieldSeparator> */}
 
         <CardContent className="px-0 pt-2">
           <div className=" text-blue-500 ">

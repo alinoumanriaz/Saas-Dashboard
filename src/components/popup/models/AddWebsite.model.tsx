@@ -63,6 +63,7 @@ interface AddWebsiteProps {
 const websiteSchema = z.object({
   companyId: z.string().min(1, "Company is required"),
   name: z.string().min(1, "Website name is required"),
+  logo: z.string(),
   domain: z
     .string()
     .min(1, "Domain is required")
@@ -134,6 +135,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
     defaultValues: {
       companyId: currentCompany?.id || "",
       name: "",
+      logo: "",
       domain: "",
       status: WebsiteStatus.ACTIVE,
       database: {
@@ -164,6 +166,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
       const mapped: WebsiteFormValues = {
         companyId: selectedData.companyId || currentCompany?.id || "",
         name: selectedData.name || "",
+        logo: selectedData.logo || "",
         domain: selectedData.domain || "",
         status: selectedData.status || WebsiteStatus.ACTIVE,
         createdBy: selectedData.createdBy || currentCompanyMemberId || "",
@@ -196,6 +199,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
       const websitePayload = {
         companyId: data.companyId,
         name: data.name.trim(),
+        logo: data.logo,
         domain: data.domain.trim().toLowerCase(),
         status: data.status,
         createdBy: data.createdBy,
