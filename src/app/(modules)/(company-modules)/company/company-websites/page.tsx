@@ -23,12 +23,14 @@ import { Badge } from "@/components/ui/badge";
 import { BiWorld, BiCheckCircle, BiXCircle } from "react-icons/bi";
 import { BsDatabase } from "react-icons/bs";
 import { toast } from "sonner";
+import Image from "next/image";
 
 const ITEMS_PER_PAGE = 10;
 
 interface IWebsite {
   id: string;
   companyId: string;
+  logo: string;
   name: string;
   domain: string;
   status: WebsiteStatus;
@@ -182,22 +184,29 @@ const CompanyWebsitesPage = () => {
   };
 
   // ----- Custom renderers for TableBox -----
-  const columns = ["website", "domain", "status", "database", "cloudinary"];
+  const columns = ["website", "status", "database", "cloudinary"];
 
   const customRenderers = {
     website: (_: any, row: IWebsite) => (
       <div className="flex items-center gap-2">
         <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
-          <BiWorld className="h-4 w-4 text-muted-foreground" />
+          {row.logo ? (
+            <Image
+              src={row.logo}
+              alt="Website Logo"
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-lg"
+            />
+          ) : (
+            <BiWorld className="h-4 w-4 text-muted-foreground" />
+          )}
         </div>
         <div>
           <div className="font-medium">{row.name}</div>
-          <div className="text-xs text-muted-foreground">ID: {row.id.slice(0, 8)}</div>
+          <div className="text-xs text-muted-foreground">{row.domain}</div>
         </div>
       </div>
-    ),
-    domain: (value: string) => (
-      <span className="font-mono text-sm">{value}</span>
     ),
     status: (value: WebsiteStatus) => {
       const isActive = value === WebsiteStatus.ACTIVE;

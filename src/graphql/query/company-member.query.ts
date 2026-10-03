@@ -138,6 +138,7 @@ query GetCompaniesOfCurrentMemberById($id: String!) {
       websites {
       id
       name
+      logo
       domain
       status
       cloudinary {

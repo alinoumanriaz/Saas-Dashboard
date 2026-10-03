@@ -18,6 +18,7 @@ export const GET_PAGINATED_WEBSITES = gql`
       websites {
         id
         companyId
+        logo
         name
         domain
         status
@@ -77,6 +78,7 @@ export const GET_WEBSITES_BY_COMPANY_ID = gql`
     getWebsitesByCompanyId(companyId: $companyId) {
       id
       name
+      logo
       domain
       createdAt
       updatedAt
@@ -88,6 +90,7 @@ export const GET_WEBSITE_BY_ID = gql`
   query GetWebsiteById($id: String!) {
     getWebsiteById(id: $id) {
       name
+      logo
       domain
       createdAt
       updatedAt

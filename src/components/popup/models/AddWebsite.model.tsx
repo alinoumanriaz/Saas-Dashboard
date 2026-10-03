@@ -47,8 +47,11 @@ import {
   BiCheckCircle,
   BiCloud,
   BiPlus,
+  BiX,
 } from "react-icons/bi";
 import { FiDatabase } from "react-icons/fi";
+import Image from "next/image";
+import AppGalleryModel from "./AppGallery.model";
 
 // ===================== Types =====================
 interface AddWebsiteProps {
@@ -125,6 +128,8 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
   );
   const currentCompany = currentCompanyMember?.companyId;
   const currentCompanyMemberId = currentCompanyMember?.id;
+  const [selectedImage, setSelectedImage] = useState<string>("");
+  const [showGalleryOpen, setShowGalleryOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
@@ -158,6 +163,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
     handleSubmit,
     formState: { errors },
     setError,
+    watch,
   } = form;
 
   // Populate edit data
@@ -213,15 +219,15 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
         },
         ...(showCloudinary && data.cloudinary
           ? {
-              cloudinary: {
-                folderName: data.cloudinary.folderName?.trim() || "",
-                cloudinaryName: data.cloudinary.cloudinaryName?.trim() || "",
-                cloudinaryNameApiKey:
-                  data.cloudinary.cloudinaryNameApiKey?.trim() || "",
-                cloudinaryNameApiKeySecret:
-                  data.cloudinary.cloudinaryNameApiKeySecret?.trim() || "",
-              },
-            }
+            cloudinary: {
+              folderName: data.cloudinary.folderName?.trim() || "",
+              cloudinaryName: data.cloudinary.cloudinaryName?.trim() || "",
+              cloudinaryNameApiKey:
+                data.cloudinary.cloudinaryNameApiKey?.trim() || "",
+              cloudinaryNameApiKeySecret:
+                data.cloudinary.cloudinaryNameApiKeySecret?.trim() || "",
+            },
+          }
           : {}),
       };
 
@@ -325,345 +331,311 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
     }
   };
 
+  const removeImage = () => {
+    setValue("logo", null);
+    setSelectedImage("");
+  };
+
+  // Gallery handlers
+  const galleryCloseHandler = () => setShowGalleryOpen(false);
+  const handleSelectedImage = (images: any[]) => {
+    if (images && images.length > 0) {
+      const image = images[0];
+      const imageUrl = image.secure_url;
+      setValue("logo", imageUrl);
+      setSelectedImage(imageUrl);
+    }
+    setShowGalleryOpen(false);
+  };
+
   // ===================== Render =====================
   return (
-    <Dialog open={true} onOpenChange={() => onCancel()}>
-      <DialogContent className="max-w-4xl! max-h-[90vh] p-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b border-border">
-          <DialogTitle className="text-2xl font-bold">
-            {isEditMode ? "Edit Website" : "Add New Website"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update website information"
-              : "Create a new website"}
-            {currentCompany && (
-              <span className="block mt-1 text-xs text-blue-600">
-                Company: {currentCompany.name}
-              </span>
-            )}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={true} onOpenChange={() => onCancel()}>
+        <DialogContent className="max-w-4xl! max-h-[90vh] p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b border-border">
+            <DialogTitle className="text-2xl font-bold">
+              {isEditMode ? "Edit Website" : "Add New Website"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditMode
+                ? "Update website information"
+                : "Create a new website"}
+              {currentCompany && (
+                <span className="block mt-1 text-xs text-blue-600">
+                  Company: {currentCompany.name}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
-          <ScrollArea className="flex-1 px-6">
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid grid-cols-3 pb-10! mb-4 bg-muted">
-                <TabsTrigger
-                  value="basic"
-                  className="flex items-center py-2! px-4! gap-2"
-                >
-                  <BiWorld className="w-4 h-6" /> Basic Info
-                </TabsTrigger>
-                <TabsTrigger
-                  value="database"
-                  className="flex items-center py-2! px-4! gap-2"
-                >
-                  <FiDatabase className="w-4 h-6" /> Database
-                </TabsTrigger>
-                <TabsTrigger
-                  value="cloudinary"
-                  className="flex items-center py-2! px-4! gap-2"
-                >
-                  <BiCloud className="w-4 h-6" /> Cloudinary
-                </TabsTrigger>
-              </TabsList>
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
+            <ScrollArea className="flex-1 px-6">
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full"
+              >
+                <TabsList className="grid grid-cols-3 pb-10! mb-4 bg-muted">
+                  <TabsTrigger
+                    value="basic"
+                    className="flex items-center py-2! px-4! gap-2"
+                  >
+                    <BiWorld className="w-4 h-6" /> Basic Info
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="database"
+                    className="flex items-center py-2! px-4! gap-2"
+                  >
+                    <FiDatabase className="w-4 h-6" /> Database
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="cloudinary"
+                    className="flex items-center py-2! px-4! gap-2"
+                  >
+                    <BiCloud className="w-4 h-6" /> Cloudinary
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* Basic Info Tab */}
-              <TabsContent value="basic" className="space-y-6">
-                <div className="bg-muted/50 p-5 rounded-lg border border-border">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center text-foreground">
-                    <BiWorld className="mr-2" /> Website Information
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Company (read-only) */}
-                    <div className="col-span-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Company *
-                      </label>
-                      <div className="mt-1 px-3 py-2 border border-border rounded-lg bg-muted/30 text-foreground">
-                        {currentCompany?.name || "No company selected"}
-                      </div>
-                      <Controller
-                        name="companyId"
-                        control={control}
-                        render={({ field }) => (
-                          <input type="hidden" {...field} />
-                        )}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Website Name *
-                      </label>
-                      <Controller
-                        name="name"
-                        control={control}
-                        render={({ field }) => (
-                          <Input
-                            {...field}
-                            placeholder="My E-commerce Store"
-                          />
-                        )}
-                      />
-                      <FieldErrorDisplay error={errors.name} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Domain *
-                      </label>
-                      <Controller
-                        name="domain"
-                        control={control}
-                        render={({ field }) => (
-                          <Input {...field} placeholder="example.com" />
-                        )}
-                      />
-                      <FieldErrorDisplay error={errors.domain} />
-                    </div>
-
-                    <div className="col-span-2">
-                      <div className="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
-                        <div>
-                          <p className="font-medium text-foreground">
-                            Website Status
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Active or Inactive
+                {/* Basic Info Tab */}
+                <TabsContent value="basic" className="space-y-6">
+                  <div className="bg-muted/50 p-5 rounded-lg border border-border">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center text-foreground">
+                      <BiWorld className="mr-2" /> Website Information
+                    </h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Company (read-only) */}
+                      <div className="col-span-1">
+                        <label className="text-sm font-medium text-foreground">
+                          Logo
+                        </label>
+                        <div className="flex flex-col items-center">
+                          <div className="relative group mb-4">
+                            <div
+                              onClick={() => setShowGalleryOpen(true)}
+                              className="w-32 h-32 rounded-lg overflow-hidden border-4 border-background shadow-lg bg-linear-to-br from-primary to-primary/70 flex items-center justify-center cursor-pointer"
+                            >
+                              {selectedImage ? (
+                                <Image
+                                  src={selectedImage}
+                                  alt="Company Logo"
+                                  width={128}
+                                  height={128}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">
+                                  {watch("name")?.charAt(0)?.toUpperCase() || "C"}
+                                </div>
+                              )}
+                            </div>
+                            {selectedImage && (
+                              <button
+                                type="button"
+                                onClick={removeImage}
+                                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-destructive/90"
+                              >
+                                <BiX className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Max 2MB • JPG, PNG, GIF
                           </p>
                         </div>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Company *
+                        </label>
+                        <div className="mt-1 px-3 py-2 border border-border rounded-lg bg-muted/30 text-foreground">
+                          {currentCompany?.name || "No company selected"}
+                        </div>
                         <Controller
-                          name="status"
+                          name="companyId"
                           control={control}
                           render={({ field }) => (
-                            <Switch
-                              checked={field.value === WebsiteStatus.ACTIVE}
-                              onCheckedChange={(checked) =>
-                                field.onChange(
-                                  checked
-                                    ? WebsiteStatus.ACTIVE
-                                    : WebsiteStatus.INACTIVE
-                                )
-                              }
-                            />
+                            <input type="hidden" {...field} />
                           )}
                         />
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
 
-              {/* Database Tab */}
-              <TabsContent value="database" className="space-y-6">
-                <div className="bg-muted/50 p-5 rounded-lg border border-border">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center text-foreground">
-                    <FiDatabase className="mr-2" /> Database Configuration
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Database Name *
-                      </label>
-                      <Controller
-                        name="database.name"
-                        control={control}
-                        render={({ field }) => (
-                          <Input {...field} placeholder="myapp_database" />
-                        )}
-                      />
-                      <FieldErrorDisplay
-                        error={getNestedError(errors, "database.name")}
-                      />
-                    </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Database Type *
-                      </label>
-                      <Controller
-                        name="database.type"
-                        control={control}
-                        render={({ field }) => (
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={DatabaseType.MONGODB}>
-                                MongoDB
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                      <FieldErrorDisplay
-                        error={getNestedError(errors, "database.type")}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Host *
-                      </label>
-                      <Controller
-                        name="database.host"
-                        control={control}
-                        render={({ field }) => (
-                          <Input {...field} placeholder="localhost" />
-                        )}
-                      />
-                      <FieldErrorDisplay
-                        error={getNestedError(errors, "database.host")}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Port *
-                      </label>
-                      <Controller
-                        name="database.port"
-                        control={control}
-                        render={({ field }) => (
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseInt(e.target.value) || 27017)
-                            }
-                            placeholder="27017"
-                          />
-                        )}
-                      />
-                      <FieldErrorDisplay
-                        error={getNestedError(errors, "database.port")}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Username *
-                      </label>
-                      <Controller
-                        name="database.username"
-                        control={control}
-                        render={({ field }) => (
-                          <Input {...field} placeholder="db_user" />
-                        )}
-                      />
-                      <FieldErrorDisplay
-                        error={getNestedError(errors, "database.username")}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">
-                        Password *
-                      </label>
-                      <Controller
-                        name="database.password"
-                        control={control}
-                        render={({ field }) => (
-                          <Input
-                            type="password"
-                            {...field}
-                            placeholder="••••••••"
-                          />
-                        )}
-                      />
-                      <FieldErrorDisplay
-                        error={getNestedError(errors, "database.password")}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* Cloudinary Tab */}
-              <TabsContent value="cloudinary" className="space-y-6">
-                <div className="bg-muted/50 p-5 rounded-lg border border-border">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold flex items-center text-foreground">
-                      <BiCloud className="mr-2" /> Cloudinary Configuration
-                    </h3>
-                    <Switch
-                      checked={showCloudinary}
-                      onCheckedChange={toggleCloudinary}
-                    />
-                  </div>
-
-                  {showCloudinary ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">
-                          Folder Name *
+                          Website Name *
                         </label>
                         <Controller
-                          name="cloudinary.folderName"
-                          control={control}
-                          render={({ field }) => (
-                            <Input {...field} placeholder="myapp-images" />
-                          )}
-                        />
-                        <FieldErrorDisplay
-                          error={getNestedError(errors, "cloudinary.folderName")}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">
-                          Cloudinary Name *
-                        </label>
-                        <Controller
-                          name="cloudinary.cloudinaryName"
-                          control={control}
-                          render={({ field }) => (
-                            <Input {...field} placeholder="mycloud" />
-                          )}
-                        />
-                        <FieldErrorDisplay
-                          error={getNestedError(
-                            errors,
-                            "cloudinary.cloudinaryName"
-                          )}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">
-                          API Key *
-                        </label>
-                        <Controller
-                          name="cloudinary.cloudinaryNameApiKey"
+                          name="name"
                           control={control}
                           render={({ field }) => (
                             <Input
                               {...field}
-                              placeholder="123456789012345"
+                              placeholder="My E-commerce Store"
+                            />
+                          )}
+                        />
+                        <FieldErrorDisplay error={errors.name} />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Domain *
+                        </label>
+                        <Controller
+                          name="domain"
+                          control={control}
+                          render={({ field }) => (
+                            <Input {...field} placeholder="example.com" />
+                          )}
+                        />
+                        <FieldErrorDisplay error={errors.domain} />
+                      </div>
+
+                      <div className="col-span-2">
+                        <div className="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
+                          <div>
+                            <p className="font-medium text-foreground">
+                              Website Status
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Active or Inactive
+                            </p>
+                          </div>
+                          <Controller
+                            name="status"
+                            control={control}
+                            render={({ field }) => (
+                              <Switch
+                                checked={field.value === WebsiteStatus.ACTIVE}
+                                onCheckedChange={(checked) =>
+                                  field.onChange(
+                                    checked
+                                      ? WebsiteStatus.ACTIVE
+                                      : WebsiteStatus.INACTIVE
+                                  )
+                                }
+                              />
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* Database Tab */}
+                <TabsContent value="database" className="space-y-6">
+                  <div className="bg-muted/50 p-5 rounded-lg border border-border">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center text-foreground">
+                      <FiDatabase className="mr-2" /> Database Configuration
+                    </h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Database Name *
+                        </label>
+                        <Controller
+                          name="database.name"
+                          control={control}
+                          render={({ field }) => (
+                            <Input {...field} placeholder="myapp_database" />
+                          )}
+                        />
+                        <FieldErrorDisplay
+                          error={getNestedError(errors, "database.name")}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Database Type *
+                        </label>
+                        <Controller
+                          name="database.type"
+                          control={control}
+                          render={({ field }) => (
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={DatabaseType.MONGODB}>
+                                  MongoDB
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                        <FieldErrorDisplay
+                          error={getNestedError(errors, "database.type")}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Host *
+                        </label>
+                        <Controller
+                          name="database.host"
+                          control={control}
+                          render={({ field }) => (
+                            <Input {...field} placeholder="localhost" />
+                          )}
+                        />
+                        <FieldErrorDisplay
+                          error={getNestedError(errors, "database.host")}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Port *
+                        </label>
+                        <Controller
+                          name="database.port"
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseInt(e.target.value) || 27017)
+                              }
+                              placeholder="27017"
                             />
                           )}
                         />
                         <FieldErrorDisplay
-                          error={getNestedError(
-                            errors,
-                            "cloudinary.cloudinaryNameApiKey"
-                          )}
+                          error={getNestedError(errors, "database.port")}
                         />
                       </div>
+
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">
-                          API Secret *
+                          Username *
                         </label>
                         <Controller
-                          name="cloudinary.cloudinaryNameApiKeySecret"
+                          name="database.username"
+                          control={control}
+                          render={({ field }) => (
+                            <Input {...field} placeholder="db_user" />
+                          )}
+                        />
+                        <FieldErrorDisplay
+                          error={getNestedError(errors, "database.username")}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Password *
+                        </label>
+                        <Controller
+                          name="database.password"
                           control={control}
                           render={({ field }) => (
                             <Input
@@ -674,57 +646,159 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
                           )}
                         />
                         <FieldErrorDisplay
-                          error={getNestedError(
-                            errors,
-                            "cloudinary.cloudinaryNameApiKeySecret"
-                          )}
+                          error={getNestedError(errors, "database.password")}
                         />
                       </div>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      Cloudinary integration is disabled. Toggle the switch to
-                      enable it.
-                    </p>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </ScrollArea>
+                  </div>
+                </TabsContent>
 
-          <DialogFooter className="mt-4 border-t border-border px-6 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <LoaderCircle className="animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  {isEditMode ? (
-                    <>
-                      <BiCheckCircle className="mr-2" /> Update Website
-                    </>
-                  ) : (
-                    <>
-                      <BiPlus className="mr-2" /> Create Website
-                    </>
-                  )}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+                {/* Cloudinary Tab */}
+                <TabsContent value="cloudinary" className="space-y-6">
+                  <div className="bg-muted/50 p-5 rounded-lg border border-border">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold flex items-center text-foreground">
+                        <BiCloud className="mr-2" /> Cloudinary Configuration
+                      </h3>
+                      <Switch
+                        checked={showCloudinary}
+                        onCheckedChange={toggleCloudinary}
+                      />
+                    </div>
+
+                    {showCloudinary ? (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">
+                            Folder Name *
+                          </label>
+                          <Controller
+                            name="cloudinary.folderName"
+                            control={control}
+                            render={({ field }) => (
+                              <Input {...field} placeholder="myapp-images" />
+                            )}
+                          />
+                          <FieldErrorDisplay
+                            error={getNestedError(errors, "cloudinary.folderName")}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">
+                            Cloudinary Name *
+                          </label>
+                          <Controller
+                            name="cloudinary.cloudinaryName"
+                            control={control}
+                            render={({ field }) => (
+                              <Input {...field} placeholder="mycloud" />
+                            )}
+                          />
+                          <FieldErrorDisplay
+                            error={getNestedError(
+                              errors,
+                              "cloudinary.cloudinaryName"
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">
+                            API Key *
+                          </label>
+                          <Controller
+                            name="cloudinary.cloudinaryNameApiKey"
+                            control={control}
+                            render={({ field }) => (
+                              <Input
+                                {...field}
+                                placeholder="123456789012345"
+                              />
+                            )}
+                          />
+                          <FieldErrorDisplay
+                            error={getNestedError(
+                              errors,
+                              "cloudinary.cloudinaryNameApiKey"
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">
+                            API Secret *
+                          </label>
+                          <Controller
+                            name="cloudinary.cloudinaryNameApiKeySecret"
+                            control={control}
+                            render={({ field }) => (
+                              <Input
+                                type="password"
+                                {...field}
+                                placeholder="••••••••"
+                              />
+                            )}
+                          />
+                          <FieldErrorDisplay
+                            error={getNestedError(
+                              errors,
+                              "cloudinary.cloudinaryNameApiKeySecret"
+                            )}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Cloudinary integration is disabled. Toggle the switch to
+                        enable it.
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </ScrollArea>
+
+            <DialogFooter className="mt-4 border-t border-border px-6 py-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <LoaderCircle className="animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    {isEditMode ? (
+                      <>
+                        <BiCheckCircle className="mr-2" /> Update Website
+                      </>
+                    ) : (
+                      <>
+                        <BiPlus className="mr-2" /> Create Website
+                      </>
+                    )}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Gallery Modal */}
+      {showGalleryOpen && (
+        <AppGalleryModel
+          onCancel={galleryCloseHandler}
+          onSentSelected={handleSelectedImage}
+          mode="single"
+        />
+      )}
+    </>
   );
 };
 

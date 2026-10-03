@@ -21,6 +21,8 @@ import {
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 import { setCompanyCurrentWebsite } from "@/redux/slicers/companyCurrentWebsite"
 import { useAppDispatch } from "@/redux/hooks"
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import { getInitials } from "@/helpers/getInitials"
 
 export function WebsiteSwitcher({
   websites,
@@ -53,9 +55,16 @@ export function WebsiteSwitcher({
               size="lg"
               className="min-w-56 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                {activeWebsite.logo}
-              </div>
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarImage
+                  className="rounded-lg!"
+                  src={activeWebsite.logo}
+                  alt={activeWebsite.name}
+                />
+                <AvatarFallback className="ring-1 ring-gray-300">
+                  {getInitials(activeWebsite.logo.name)}
+                </AvatarFallback>
+              </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{activeWebsite.name}</span>
                 <span className="truncate text-xs">{activeWebsite.plan}</span>
@@ -79,7 +88,16 @@ export function WebsiteSwitcher({
                 className="gap-2 p-2"
               >
                 <div className="flex size-6 items-center justify-center rounded-md border">
-                  {website.logo}
+                  <Avatar className="h-8 w-8 rounded-lg">
+                    <AvatarImage
+                      className="rounded-lg!"
+                      src={activeWebsite.logo}
+                      alt={activeWebsite.name}
+                    />
+                    <AvatarFallback className="ring-1 ring-gray-300">
+                      {getInitials(activeWebsite.logo.name)}
+                    </AvatarFallback>
+                  </Avatar>
                 </div>
                 {website.name}
                 {/* <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut> */}

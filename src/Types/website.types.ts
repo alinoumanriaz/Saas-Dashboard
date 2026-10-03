@@ -20,6 +20,7 @@ export interface CloudinaryConfig {
 export interface Website {
   id: string;
   name: string;
+  logo?: string;
   domain: string;
   status: WebsiteStatus;
   database: DatabaseConfig;
