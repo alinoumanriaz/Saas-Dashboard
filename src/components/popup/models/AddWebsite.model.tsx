@@ -66,7 +66,7 @@ interface AddWebsiteProps {
 const websiteSchema = z.object({
   companyId: z.string().min(1, "Company is required"),
   name: z.string().min(1, "Website name is required"),
-  logo: z.string(),
+  logo: z.string().nullable().optional(),
   domain: z
     .string()
     .min(1, "Domain is required")
@@ -140,7 +140,7 @@ const AddWebsite: React.FC<AddWebsiteProps> = ({
     defaultValues: {
       companyId: currentCompany?.id || "",
       name: "",
-      logo: "",
+      logo: null,
       domain: "",
       status: WebsiteStatus.ACTIVE,
       database: {
