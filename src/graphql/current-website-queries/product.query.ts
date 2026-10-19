@@ -5,7 +5,7 @@ query GetPaginatedProducts(
   $page: Int!
   $limit: Int!
   $search: String
-  $status: String
+  $status: ProductStatus
   $isFeatured: Boolean
   $industry: ID
   $material: ID

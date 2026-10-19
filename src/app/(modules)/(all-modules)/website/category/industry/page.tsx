@@ -82,6 +82,10 @@ const Page = () => {
     }
   );
 
+  useEffect(()=>{
+    refetch()
+  },[currentWebsiteId])
+
   const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
 
   const [deleteIndustries] = useMutation<any>(DELETE_INDUSTRIES);

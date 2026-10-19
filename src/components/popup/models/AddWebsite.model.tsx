@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 // src/components/popup/models/AddWebsite.model.tsx
 "use client";
 

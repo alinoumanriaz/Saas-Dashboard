@@ -1,15 +1,12 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client"
 
-import * as React from "react"
-
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -23,6 +20,7 @@ import { setCompanyCurrentWebsite } from "@/redux/slicers/companyCurrentWebsite"
 import { useAppDispatch } from "@/redux/hooks"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import { getInitials } from "@/helpers/getInitials"
+import { useEffect, useState } from "react"
 
 export function WebsiteSwitcher({
   websites,
@@ -31,16 +29,30 @@ export function WebsiteSwitcher({
 }) {
   const dispatch = useAppDispatch()
   const { isMobile } = useSidebar()
-  const [activeWebsite, setActiveWebsite] = React.useState<any>()
+  const [activeWebsite, setActiveWebsite] =
+    useState<any>(websites[0] ?? null)
 
-  React.useEffect(() => {
-    if (websites?.length) {
-      setActiveWebsite(websites[0]);
-      dispatch(setCompanyCurrentWebsite(websites[0]));
-    } else {
-      setActiveWebsite(null);
-    }
-  }, [websites]);
+  // Keep the selected website valid when the list changes.
+  useEffect(() => {
+    setActiveWebsite((currentWebsite: any) => {
+      if (currentWebsite) {
+        const updatedWebsite = websites.find(
+          (website) => website.id === currentWebsite.id
+        )
+
+        if (updatedWebsite) {
+          return updatedWebsite
+        }
+      }
+
+      return websites[0] ?? null
+    })
+  }, [websites])
+
+  // Update the selected website in Redux.
+  useEffect(() => {
+    dispatch(setCompanyCurrentWebsite(activeWebsite))
+  }, [activeWebsite, dispatch])
 
   if (!activeWebsite) {
     return null
@@ -62,7 +74,7 @@ export function WebsiteSwitcher({
                   alt={activeWebsite.name}
                 />
                 <AvatarFallback className="ring-1 ring-gray-300">
-                  {getInitials(activeWebsite.logo.name)}
+                  {getInitials(activeWebsite.name)}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -83,7 +95,7 @@ export function WebsiteSwitcher({
             </DropdownMenuLabel>
             {websites.map((website, index) => (
               <DropdownMenuItem
-                key={website.name}
+                key={index}
                 onClick={() => setActiveWebsite(website)}
                 className="gap-2 p-2"
               >
@@ -91,11 +103,11 @@ export function WebsiteSwitcher({
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage
                       className="rounded-lg!"
-                      src={activeWebsite.logo}
-                      alt={activeWebsite.name}
+                      src={website.logo}
+                      alt={website.name}
                     />
                     <AvatarFallback className="ring-1 ring-gray-300">
-                      {getInitials(activeWebsite.logo.name)}
+                      {getInitials(website.name)}
                     </AvatarFallback>
                   </Avatar>
                 </div>

@@ -17,7 +17,7 @@ const authLink = new SetContextLink((prevContext) => {
   const websiteId =
     store.getState().companyCurrentWebsite.companyWebsite?.id;
 
-    // console.log("Apollo Client - prevContext:", prevContext.headers); // Debugging line
+    console.log("Apollo Client - prevContext:", websiteId); // Debugging line
 
   return {
     headers: {
