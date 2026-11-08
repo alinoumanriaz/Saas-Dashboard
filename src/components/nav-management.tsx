@@ -265,7 +265,7 @@ function MenuItem({ item, level = 0 }: MenuItemProps) {
               />
             )}
 
-            <span>{item.moduleId.moduleName}</span>
+            <span className="text-sm">{item.moduleId.moduleName}</span>
 
             <ChevronRight
               className="

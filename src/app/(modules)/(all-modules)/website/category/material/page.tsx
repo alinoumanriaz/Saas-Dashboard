@@ -82,7 +82,8 @@ const Page = () => {
     }
   );
 
-  const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
+  // const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
+  const showTableLoading = loading || !currentWebsiteId;
 
   const [deleteMaterials] = useMutation<any>(DELETE_MATERIALS);
 
@@ -98,6 +99,12 @@ const Page = () => {
     ...material,
     id: material.id,
   }));
+
+  useEffect(() => {
+    if (currentWebsiteId) {
+      refetch();
+    }
+  }, [currentWebsiteId, refetch]);
 
   // const materialsWithContent = allMaterials.filter((m) => {
   //   const content = m.content;

@@ -196,6 +196,11 @@ const PrivacyPolicyPage = () => {
     (state) => state.currentCompanyMember.companyMember
   );
 
+  const companyCurrentWebsite = useAppSelector(
+      (state) => state.companyCurrentWebsite.companyWebsite
+    );
+    const currentWebsiteId = companyCurrentWebsite?.id;
+
   // -------------- GraphQL hooks --------------
   const {
     loading: pageLoading,
@@ -206,6 +211,12 @@ const PrivacyPolicyPage = () => {
     skip: !currentcompanyMember?.id,
     fetchPolicy: "network-only",
   });
+
+  useEffect(() => {
+      if (currentWebsiteId) {
+        refetch();
+      }
+    }, [currentWebsiteId, refetch]);
 
   const [updatePage, { loading: updating }] = useMutation<any>(
     UPDATE_PRIVACY_POLICY_PAGE,

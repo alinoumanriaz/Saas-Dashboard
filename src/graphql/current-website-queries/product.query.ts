@@ -7,9 +7,9 @@ query GetPaginatedProducts(
   $search: String
   $status: ProductStatus
   $isFeatured: Boolean
-  $industry: ID
-  $material: ID
-  $style: ID
+  $industries: [ID!]
+  $materials: [ID!]
+  $styles: [ID!]
 ) {
   getPaginatedProducts(
     page: $page
@@ -17,9 +17,9 @@ query GetPaginatedProducts(
     search: $search
     status: $status
     isFeatured: $isFeatured
-    industry: $industry
-    material: $material
-    style: $style
+    industries: $industries
+    materials: $materials
+    styles: $styles
   ) {
     products {
       id
@@ -37,15 +37,15 @@ query GetPaginatedProducts(
         url
         alt
       }
-      industry {
+      industries {
         id
         name
       }
-      material {
+      materials {
         id
         name
       }
-      style {
+      styles {
         id
         name
       }

@@ -82,11 +82,14 @@ const Page = () => {
     }
   );
 
-  useEffect(()=>{
-    refetch()
-  },[currentWebsiteId])
+  useEffect(() => {
+    if (currentWebsiteId) {
+      refetch();
+    }
+  }, [currentWebsiteId, refetch]);
 
-  const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
+  // const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
+  const showTableLoading = loading || !currentWebsiteId;
 
   const [deleteIndustries] = useMutation<any>(DELETE_INDUSTRIES);
 
@@ -95,7 +98,7 @@ const Page = () => {
   const totalIndustries = data?.getPaginatedIndustries?.totalIndustries || 0;
   const totalPages = Math.ceil(totalIndustries / ITEMS_PER_PAGE);
 
-  console.log({allIndustries:allIndustries})
+  console.log({ allIndustries: allIndustries })
 
   // Map data to include `id` for TableBox compatibility
   const industriesData = allIndustries.map((industry) => ({
@@ -161,7 +164,7 @@ const Page = () => {
       });
 
       if (data?.deleteIndustries?.success) {
-        console.log({deleetdata:data})
+        console.log({ deleetdata: data })
         toast.success(data.deleteIndustries.message);
         setShowConfirmationModel(false);
         refetch();
@@ -317,9 +320,8 @@ const Page = () => {
           onCancel={cancelDelete}
           onDelete={confirmDelete}
           title="Delete Industries"
-          message={`Are you sure you want to delete ${selectedIdsForDeletion.length} industr${
-            selectedIdsForDeletion.length === 1 ? "y" : "ies"
-          }? This action cannot be undone.`}
+          message={`Are you sure you want to delete ${selectedIdsForDeletion.length} industr${selectedIdsForDeletion.length === 1 ? "y" : "ies"
+            }? This action cannot be undone.`}
           confirmText="Delete"
           cancelText="Cancel"
           loading={isDeleting}

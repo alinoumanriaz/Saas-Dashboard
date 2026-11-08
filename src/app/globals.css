@@ -141,7 +141,7 @@ td {
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   /* --primary: #1a3260; */
-  --primary: #FF6A3D;
+  --primary: #155dfc;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -256,3 +256,49 @@ body {
   border: 1px solid #94a3b8 !important;
   padding: 0.5rem 1rem !important;
 } */
+
+.tiptap-content table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 16px 0;
+  overflow: hidden;
+}
+
+.tiptap-content th,
+.tiptap-content td {
+  border: 1px solid #d1d5db;
+  padding: 10px 12px;
+  min-width: 80px;
+  vertical-align: top;
+  text-align: left;
+}
+
+.tiptap-content th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+.tiptap-content td p,
+.tiptap-content th p {
+  margin: 0;
+}
+
+.tiptap-content .selectedCell {
+  background: #dbeafe;
+}
+
+.tiptap-content .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -2px;
+  width: 4px;
+  background: #3b82f6;
+  pointer-events: none;
+}
+
+.tiptap-content .tableWrapper {
+  overflow-x: auto;
+  margin: 16px 0;
+}

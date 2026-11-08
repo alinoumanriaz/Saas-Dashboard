@@ -202,6 +202,10 @@ const Page = () => {
   const [metaDescription, setMetaDescription] = useState("");
   const [shortDescription, setShortDescription] = useState("");
   const [pageId, setPageId] = useState();
+  const companyCurrentWebsite = useAppSelector(
+      (state) => state.companyCurrentWebsite.companyWebsite
+    );
+    const currentWebsiteId = companyCurrentWebsite?.id;
 
   // Banner images state
   const [bannerImages, setBannerImages] = useState<{
@@ -489,6 +493,12 @@ const Page = () => {
     setBannerImages((prev) => ({ ...prev, [mode]: { ...prev[mode], alt } }));
     markDirty();
   };
+
+  useEffect(() => {
+    if (currentWebsiteId) {
+      refetch();
+    }
+  }, [currentWebsiteId, refetch]);
 
   // ---------- Loading / Error / No data states ----------
   if (pageLoading && !data) {

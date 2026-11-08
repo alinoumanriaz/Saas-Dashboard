@@ -195,6 +195,10 @@ const TermsConditionsPage = () => {
   const currentcompanyMember = useAppSelector(
     (state) => state.currentCompanyMember.companyMember
   );
+  const companyCurrentWebsite = useAppSelector(
+    (state) => state.companyCurrentWebsite.companyWebsite
+  );
+  const currentWebsiteId = companyCurrentWebsite?.id;
 
   // -------------- GraphQL hooks --------------
   const {
@@ -232,6 +236,12 @@ const TermsConditionsPage = () => {
       },
     }
   );
+
+  useEffect(() => {
+    if (currentWebsiteId) {
+      refetch();
+    }
+  }, [currentWebsiteId, refetch]);
 
   const [checkUnique, { loading: uniqueLoading }] = useLazyQuery<any>(
     CHECK_UNIQUE,
@@ -526,15 +536,15 @@ const TermsConditionsPage = () => {
             <Clock className="h-3.5 w-3.5" />
             {page.updatedAt
               ? `Last updated ${new Date(page.updatedAt).toLocaleDateString(
-                  "en-US",
-                  {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }
-                )}`
+                "en-US",
+                {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }
+              )}`
               : "Never updated"}
           </p>
         </div>
@@ -597,8 +607,8 @@ const TermsConditionsPage = () => {
                         msg: checkH1InContent()
                           ? "Found in content"
                           : h1Tag.trim()
-                          ? "Set manually"
-                          : "Missing — required",
+                            ? "Set manually"
+                            : "Missing — required",
                       },
                       {
                         label: "Meta title",
@@ -735,7 +745,7 @@ const TermsConditionsPage = () => {
                               aria-label="Check meta title uniqueness"
                             >
                               {uniqueLoading &&
-                              metaTitleCheckStatus === "checking" ? (
+                                metaTitleCheckStatus === "checking" ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <Search className="h-4 w-4" />

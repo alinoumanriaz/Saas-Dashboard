@@ -6,6 +6,7 @@ import { LOGOUT_MEMBER } from "@/graphql/query/member.query";
 import { useRouter } from "next/navigation";
 import { useAppDispatch } from "@/redux/hooks";
 import { clearMember } from "@/redux/slicers/currentMember";
+import axios from "axios";
 
 export default function useLogout() {
   const router = useRouter();

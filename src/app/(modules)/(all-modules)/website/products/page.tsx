@@ -16,6 +16,7 @@ import ConfirmationBox from "@/components/popup/models/ConfirmationBox";
 import AddProduct from "@/components/popup/models/AddProduct.model";
 import Image from "next/image";
 import { DELETE_PRODUCTS, GET_PAGINATED_PRODUCTS } from "@/graphql/current-website-queries/product.query";
+import { countWords } from "@/helpers/wordCounter";
 
 // --- Types ---
 interface IProduct {
@@ -117,6 +118,8 @@ const Page = () => {
     ...product,
     id: product.id,
   }));
+
+  console.log('all pagenated products:', productsData)
 
   // Optional stats – adapt as needed
   // const featuredCount = allProducts.filter(p => p.isFeatured).length;
@@ -223,21 +226,39 @@ const Page = () => {
     setShowAddModel(false);
   };
 
+  useEffect(() => {
+  if (currentWebsiteId) {
+    refetch();
+  }
+}, [currentWebsiteId, refetch]);
+
+  // Reset page and search when switching websites
+// useEffect(() => {
+//   dispatch({ type: "SET_PAGE", payload: 1 });
+// }, [currentWebsiteId, dispatch]);
+
+
   // Table columns and custom renderers
   const columns = ["image", "name", "slug", "h1Tag", "metaTitle", "metaDescription", "description", "status", "author", "isFeatured", "createdAt", "updatedAt"];
 
   const customRenderers = {
     image: (value: string, row: any) => (
-      <div className="flex items-center justify-center">
+      <div className="flex relative items-center justify-center">
         {row.imageUrl && (
           <Image
-            src={getImageUrl(row.imageUrl)}
+            src={row.imageUrl[0].url}
             alt={row.name}
             className="h-10 w-10 rounded object-cover"
             width={40}
             height={40}
           />
         )}
+        <div
+          className={`absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-background ${row.imageUrl.length < 2 ? "bg-red-500" : "bg-green-500"
+            }`}
+        >
+          {row.imageUrl.length}
+        </div>
       </div>
     ),
     name: (value: string) => (
@@ -250,7 +271,11 @@ const Page = () => {
         {value}
       </div>
     ),
-    h1Tag: (value: string) => value || "—",
+    h1Tag: (value: string) => (
+      <div className="max-w-30 truncate" title={value || ""}>
+        {value || "—"}
+      </div>
+    ),
     metaTitle: (value: string) => (
       <div className="max-w-30 truncate" title={value || ""}>
         {value || "—"}
@@ -261,11 +286,29 @@ const Page = () => {
         {value || "—"}
       </div>
     ),
-    description: (value: string) => (
-      <div className="max-w-37.5 truncate" title={value || ""}>
-        {value || "—"}
-      </div>
-    ),
+    description: (value: string) => {
+
+      const wordCount = countWords(value ?? "");
+
+      const countColor =
+        wordCount < 500
+          ? "bg-red-500 text-white"
+          : wordCount <= 800
+            ? "bg-yellow-500"
+            : "bg-green-500";
+      return (
+        <>
+
+          <div className={` max-w-37.5 truncate`} title={value || ""}>
+            <span className={`${countColor} rounded-md px-1 py-0.5`}>
+              {wordCount}
+            </span>
+            {value || "—"}
+          </div>
+        </>
+
+      )
+    },
     status: (value: string) => (
       <span
         className={`px-2 py-0.5 rounded-full text-xs font-medium ${value === "PUBLISHED"

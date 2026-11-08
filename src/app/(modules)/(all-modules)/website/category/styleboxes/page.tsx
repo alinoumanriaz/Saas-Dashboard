@@ -82,7 +82,8 @@ const Page = () => {
     }
   );
 
-  const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
+  // const showTableLoading = (loading && networkStatus === 1) || !currentWebsiteId;
+  const showTableLoading = loading || !currentWebsiteId;
 
   const [deleteStyles] = useMutation<any>(DELETE_STYLES);
 
@@ -98,6 +99,12 @@ const Page = () => {
     ...style,
     id: style.id,
   }));
+
+  useEffect(() => {
+    if (currentWebsiteId) {
+      refetch();
+    }
+  }, [currentWebsiteId, refetch]);
 
   // const stylesWithContent = allStyles.filter((s) => {
   //   const content = s.content;

@@ -180,207 +180,211 @@ const TableBox = ({
       )}
 
       <div className="flex-1 overflow-hidden  custom-white-box">
-          <Table className="w-full " tableHeight={height}>
-            <TableHeader className="sticky top-0 z-20 bg-white">
-              <TableRow className="hover:bg-transparent text-sm uppercase">
-                {checkbox && (
-                  <TableHead className="sticky left-0 z-30 min-w-9">
-                    <Checkbox
-                      checked={
-                        selectedIds.length > 0 &&
-                        selectedIds.length === sortedData.length
-                      }
-                      onCheckedChange={toggleAll}
-                    />
-                  </TableHead>
-                )}
+        <Table className="w-full " tableHeight={height}>
+          <TableHeader className="sticky top-0 z-20 bg-white">
+            <TableRow className="hover:bg-transparent text-sm uppercase">
+              {checkbox && (
+                <TableHead className="sticky left-0 z-30 min-w-9">
+                  <Checkbox
+                    checked={
+                      selectedIds.length > 0 &&
+                      selectedIds.length === sortedData.length
+                    }
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
+              )}
 
-                {iconImageUrl && <TableHead>Icon</TableHead>}
-                {image && <TableHead>Image</TableHead>}
-                {logo && <TableHead>Company Logo</TableHead>}
-                {bannerImage && <TableHead>Banner</TableHead>}
+              {iconImageUrl && <TableHead>Icon</TableHead>}
+              {image && <TableHead>Image</TableHead>}
+              {logo && <TableHead>Company Logo</TableHead>}
+              {bannerImage && <TableHead>Banner</TableHead>}
 
-                {column.map((col, idx) => (
-                  <TableHead
-                    key={idx}
-                    className="cursor-pointer"
-                    onClick={() => handleSort(col)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>{col.replace(/([A-Z])/g, " $1").trim()}</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                ))}
+              {column.map((col, idx) => (
+                <TableHead
+                  key={idx}
+                  className="cursor-pointer"
+                  onClick={() => handleSort(col)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{col.replace(/([A-Z])/g, " $1").trim()}</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              ))}
 
-                {subscription && <TableHead>Subscription</TableHead>}
-                {isFeatured && <TableHead>Featured</TableHead>}
-                {MemberStatus && <TableHead>Status</TableHead>}
+              {subscription && <TableHead>Subscription</TableHead>}
+              {isFeatured && <TableHead>Featured</TableHead>}
+              {MemberStatus && <TableHead>Status</TableHead>}
 
-                {industry && (
-                  <TableHead
-                    className="cursor-pointer hover:bg-muted/80 transition-colors"
-                    onClick={() => handleSort("industry")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Industry</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                )}
+              {industry && (
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/80 transition-colors"
+                  onClick={() => handleSort("industry")}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Industry</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              )}
 
-                {material && (
-                  <TableHead
-                    className="cursor-pointer hover:bg-muted/80 transition-colors"
-                    onClick={() => handleSort("material")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Material</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                )}
+              {material && (
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/80 transition-colors"
+                  onClick={() => handleSort("material")}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Material</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              )}
 
-                {style && (
-                  <TableHead
-                    className="cursor-pointer hover:bg-muted/80 transition-colors"
-                    onClick={() => handleSort("style")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Style</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                )}
+              {style && (
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/80 transition-colors"
+                  onClick={() => handleSort("style")}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Style</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              )}
 
-                {status && <TableHead>Status</TableHead>}
+              {status && <TableHead>Status</TableHead>}
 
-                {isVerified && (
-                  <TableHead
-                    className="cursor-pointer hover:bg-muted/80 transition-colors"
-                    onClick={() => handleSort("isVerified")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Verified</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                )}
+              {isVerified && (
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/80 transition-colors"
+                  onClick={() => handleSort("isVerified")}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Verified</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              )}
 
-                {createdBy && (
-                  <TableHead
-                    className="cursor-pointer hover:bg-muted/80 transition-colors"
-                    onClick={() => handleSort("createdBy")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Created By</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                )}
+              {createdBy && (
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/80 transition-colors"
+                  onClick={() => handleSort("createdBy")}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Created By</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              )}
 
-                {author && (
-                  <TableHead
-                    className="cursor-pointer hover:bg-muted/80 transition-colors"
-                    onClick={() => handleSort("author")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Author</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                )}
+              {author && (
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/80 transition-colors"
+                  onClick={() => handleSort("author")}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Author</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              )}
 
-                {updatedAt && (
-                  <TableHead
-                    className="cursor-pointer transition-colors"
-                    onClick={() => handleSort("updatedAt")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Updated At</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                )}
+              {updatedAt && (
+                <TableHead
+                  className="cursor-pointer transition-colors"
+                  onClick={() => handleSort("updatedAt")}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Updated At</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              )}
 
-                {createdAt && (
-                  <TableHead
-                    className="cursor-pointer transition-colors"
-                    onClick={() => handleSort("createdAt")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Created At</span>
-                      <RxCaretSort className="size-4" />
-                    </div>
-                  </TableHead>
-                )}
+              {createdAt && (
+                <TableHead
+                  className="cursor-pointer transition-colors"
+                  onClick={() => handleSort("createdAt")}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Created At</span>
+                    <RxCaretSort className="size-4" />
+                  </div>
+                </TableHead>
+              )}
 
-                {action && (
-                  <TableHead className="sticky right-0 z-30 backdrop-blur-sm text-center">
-                    Actions
-                  </TableHead>
-                )}
+              {action && (
+                <TableHead className="sticky right-0 z-30 backdrop-blur-sm text-center">
+                  Actions
+                </TableHead>
+              )}
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+            {sortedData.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={totalColumns}
+                  className="text-center text-muted-foreground py-12"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <svg
+                      className="w-12 h-12 text-muted-foreground/30"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                      />
+                    </svg>
+                    <span className="font-medium">No data available</span>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
+            ) : (
+              sortedData.map((item, index) => (
+                <TableRow
+                  key={`${index}-${item.id || index}`}
+                  className=" transition-colors"
+                >
+                  {checkbox && (
+                    <TableCell className="sticky left-0 z-10 bg-background">
+                      <Checkbox
+                        checked={selectedIds.includes(item.id)}
+                        onCheckedChange={() => toggleRow(item.id)}
+                      />
+                    </TableCell>
+                  )}
 
-            <TableBody>
-              {sortedData.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={totalColumns}
-                    className="text-center text-muted-foreground py-12"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <svg
-                        className="w-12 h-12 text-muted-foreground/30"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  {iconImageUrl && (
+                    <TableCell>
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage
+                          src={
+                            Array.isArray(item?.iconImageUrl)
+                              ? item?.iconImageUrl[0]?.url || "/box-placeholder.jpg"
+                              : item?.iconImageUrl?.url || "/box-placeholder.jpg"
+                          }
+                          alt="icon"
                         />
-                      </svg>
-                      <span className="font-medium">No data available</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedData.map((item, index) => (
-                  <TableRow
-                    key={`${index}-${item.id || index}`}
-                    className=" transition-colors"
-                  >
-                    {checkbox && (
-                      <TableCell className="sticky left-0 z-10 bg-background">
-                        <Checkbox
-                          checked={selectedIds.includes(item.id)}
-                          onCheckedChange={() => toggleRow(item.id)}
-                        />
-                      </TableCell>
-                    )}
+                        <AvatarFallback>IC</AvatarFallback>
+                      </Avatar>
+                    </TableCell>
+                  )}
 
-                    {iconImageUrl && (
-                      <TableCell>
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage
-                            src={
-                              Array.isArray(item?.iconImageUrl)
-                                ? item?.iconImageUrl[0]?.url || "/box-placeholder.jpg"
-                                : item?.iconImageUrl?.url || "/box-placeholder.jpg"
-                            }
-                            alt="icon"
-                          />
-                          <AvatarFallback>IC</AvatarFallback>
-                        </Avatar>
-                      </TableCell>
-                    )}
+                  {image && (
+                    <TableCell>
+                      {/* 1. The relative wrapper allows the absolute badge to position against it */}
+                      <div className="relative inline-block">
 
-                    {image && (
-                      <TableCell>
+                        {/* 2. The Avatar (keep it simple) */}
                         <Avatar className="h-10 w-10 ring-2 ring-border">
                           <AvatarImage
                             src={
@@ -392,191 +396,203 @@ const TableBox = ({
                           />
                           <AvatarFallback>IMG</AvatarFallback>
                         </Avatar>
-                      </TableCell>
-                    )}
 
-                    {logo && (
-                      <TableCell>
-                        <Avatar className="h-10 w-10 ring-2 ring-border">
-                          <AvatarImage
-                            src={item?.logo || "/box-placeholder.jpg"}
-                            alt="logo"
-                          />
-                          <AvatarFallback>LG</AvatarFallback>
-                        </Avatar>
-                      </TableCell>
-                    )}
+                        {/* 3. The Badge - positioned absolute to the top right of the wrapper */}
+                        {Array.isArray(item?.imageUrl) && (
+                          <div
+                            className={`absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-background ${item.imageUrl.length < 2 ? "bg-red-500" : "bg-green-500"
+                              }`}
+                          >
+                            {item.imageUrl.length}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
 
-                    {bannerImage && (
-                      <TableCell>
-                        <div className="relative w-24 h-10 rounded-lg overflow-hidden ring-1 ring-border">
-                          <Image
-                            src={
-                              Array.isArray(item?.bannerImage)
-                                ? item?.bannerImage[0]?.url || "/box-placeholder.jpg"
-                                : item?.bannerImage?.url || "/box-placeholder.jpg"
-                            }
-                            alt="banner"
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                      </TableCell>
-                    )}
+                  {logo && (
+                    <TableCell>
+                      <Avatar className="h-10 w-10 ring-2 ring-border">
+                        <AvatarImage
+                          src={item?.logo || "/box-placeholder.jpg"}
+                          alt="logo"
+                        />
+                        <AvatarFallback>LG</AvatarFallback>
+                      </Avatar>
+                    </TableCell>
+                  )}
 
-                    {/* Dynamic columns */}
-                    {column.map((col, idx) => {
-                      if (customRenderers[col]) {
-                        return (
-                          <TableCell key={`${idx}-${col}`}>
-                            {customRenderers[col](item[col], item)}
-                          </TableCell>
-                        );
-                      }
+                  {bannerImage && (
+                    <TableCell>
+                      <div className="relative w-24 h-10 rounded-lg overflow-hidden ring-1 ring-border">
+                        <Image
+                          src={
+                            Array.isArray(item?.bannerImage)
+                              ? item?.bannerImage[0]?.url || "/box-placeholder.jpg"
+                              : item?.bannerImage?.url || "/box-placeholder.jpg"
+                          }
+                          alt="banner"
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    </TableCell>
+                  )}
+
+                  {/* Dynamic columns */}
+                  {column.map((col, idx) => {
+                    if (customRenderers[col]) {
                       return (
                         <TableCell key={`${idx}-${col}`}>
-                          <div
-                            className="max-w-xs truncate"
-                            title={String(item[col] ?? "")}
-                          >
-                            {item[col] !== undefined && item[col] !== null
-                              ? String(item[col])
-                              : "-"}
-                          </div>
+                          {customRenderers[col](item[col], item)}
                         </TableCell>
                       );
-                    })}
-
-                    {isFeatured && (
-                      <TableCell>
-                        <Badge
-                          variant={item.isFeatured ? "default" : "secondary"}
+                    }
+                    return (
+                      <TableCell key={`${idx}-${col}`}>
+                        <div
+                          className="max-w-xs truncate"
+                          title={String(item[col] ?? "")}
                         >
-                          {item.isFeatured ? "Featured" : "Standard"}
-                        </Badge>
+                          {item[col] !== undefined && item[col] !== null
+                            ? String(item[col])
+                            : "-"}
+                        </div>
                       </TableCell>
-                    )}
+                    );
+                  })}
 
-                    {subscription && (
-                      <TableCell>
-                        <Badge
-                          variant={
-                            item?.subscription?.isActive ? "default" : "destructive"
-                          }
-                        >
-                          {item?.subscription?.plan || "-"}
-                        </Badge>
-                      </TableCell>
-                    )}
+                  {isFeatured && (
+                    <TableCell>
+                      <Badge
+                        variant={item.isFeatured ? "default" : "secondary"}
+                      >
+                        {item.isFeatured ? "Featured" : "Standard"}
+                      </Badge>
+                      
+                    </TableCell>
+                  )}
 
-                    {industry && (
-                      <TableCell>{item?.industry?.name || "-"}</TableCell>
-                    )}
+                  {subscription && (
+                    <TableCell>
+                      <Badge
+                        variant={
+                          item?.subscription?.isActive ? "default" : "destructive"
+                        }
+                      >
+                        {item?.subscription?.plan || "-"}
+                      </Badge>
+                    </TableCell>
+                  )}
 
-                    {material && (
-                      <TableCell>{item?.material?.name || "-"}</TableCell>
-                    )}
+                  {industry && (
+                    <TableCell>{item?.industry?.name || "-"}</TableCell>
+                  )}
 
-                    {style && (
-                      <TableCell>{item?.style?.name || "-"}</TableCell>
-                    )}
+                  {material && (
+                    <TableCell>{item?.material?.name || "-"}</TableCell>
+                  )}
 
-                    {MemberStatus && (
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={
-                            item.status === "ACTIVE"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : item.status === "INACTIVE"
+                  {style && (
+                    <TableCell>{item?.style?.name || "-"}</TableCell>
+                  )}
+
+                  {MemberStatus && (
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          item.status === "ACTIVE"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : item.status === "INACTIVE"
                               ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                               : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          }
-                        >
-                          {item.status || "UNKNOWN"}
-                        </Badge>
-                      </TableCell>
-                    )}
+                        }
+                      >
+                        {item.status || "UNKNOWN"}
+                      </Badge>
+                    </TableCell>
+                  )}
 
-                    {status && (
-                      <TableCell>
-                        <Badge
-                          variant={
-                            item.status === "published" ? "default" : "secondary"
-                          }
-                        >
-                          {item.status === "published" ? "Published" : "Draft"}
-                        </Badge>
-                      </TableCell>
-                    )}
+                  {status && (
+                    <TableCell>
+                      <Badge
+                        variant={
+                          item.status === "published" ? "default" : "secondary"
+                        }
+                      >
+                        {item.status === "published" ? "Published" : "Draft"}
+                      </Badge>
+                    </TableCell>
+                  )}
 
-                    {isVerified && (
-                      <TableCell>
-                        <Badge
-                          variant={item.isVerified ? "default" : "secondary"}
-                        >
-                          {item.isVerified ? "Verified" : "Pending"}
-                        </Badge>
-                      </TableCell>
-                    )}
+                  {isVerified && (
+                    <TableCell>
+                      <Badge
+                        variant={item.isVerified ? "default" : "secondary"}
+                      >
+                        {item.isVerified ? "Verified" : "Pending"}
+                      </Badge>
+                    </TableCell>
+                  )}
 
-                    {createdBy && (
-                      <TableCell>{item?.createdBy?.username || "-"}</TableCell>
-                    )}
+                  {createdBy && (
+                    <TableCell>{item?.createdBy?.username || "-"}</TableCell>
+                  )}
 
-                    {author && (
-                      <TableCell>{item?.author?.username || "-"}</TableCell>
-                    )}
+                  {author && (
+                    <TableCell>{item?.author?.username || "-"}</TableCell>
+                  )}
 
-                    {updatedAt && (
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(item?.updatedAt)}
-                      </TableCell>
-                    )}
+                  {updatedAt && (
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(item?.updatedAt)}
+                    </TableCell>
+                  )}
 
-                    {createdAt && (
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(item.createdAt)}
-                      </TableCell>
-                    )}
+                  {createdAt && (
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(item.createdAt)}
+                    </TableCell>
+                  )}
 
-                    {/* Actions */}
-                    {action && (
-                      <TableCell className="sticky right-0 z-10 bg-background flex justify-center items-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            {edithandler && (
-                              <DropdownMenuItem onClick={() => edithandler?.(item)}>
-                                Edit
-                              </DropdownMenuItem>
-                            )}
-                            {viewhandler && (
-                              <DropdownMenuItem onClick={() => viewhandler?.(item)}>
-                                View
-                              </DropdownMenuItem>
-                            )}
-                            {deletehandler && (
-                              <DropdownMenuItem
-                                onClick={() => deletehandler?.([item.id])}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                  {/* Actions */}
+                  {action && (
+                    <TableCell className="sticky right-0 z-10 bg-background flex justify-center items-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          {edithandler && (
+                            <DropdownMenuItem onClick={() => edithandler?.(item)}>
+                              Edit
+                            </DropdownMenuItem>
+                          )}
+                          {viewhandler && (
+                            <DropdownMenuItem onClick={() => viewhandler?.(item)}>
+                              View
+                            </DropdownMenuItem>
+                          )}
+                          {deletehandler && (
+                            <DropdownMenuItem
+                              onClick={() => deletehandler?.([item.id])}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
       {totalPages > 1 && (
