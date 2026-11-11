@@ -8,7 +8,7 @@ export const GET_PAGINATED_STYLES = gql`
         id
         name
         slug
-        description
+        shortDescription
         h1Tag
         metaDescription
         metaTitle
@@ -77,7 +77,7 @@ export const GET_ALL_STYLES = gql`
       iconImageUrl
       imageUrl
       bannerImage
-      description
+      shortDescription
       content
       faqs {
           question

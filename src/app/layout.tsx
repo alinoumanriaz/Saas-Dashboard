@@ -3,10 +3,9 @@ import "./globals.css";
 import ApolloWrapper from "@/helpers/ApolloProvider";
 import { ToastContainer } from "react-toastify";
 import { Providers } from "@/redux/providers";
-import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { MantineProvider } from "@mantine/core";
+// import { MantineProvider } from "@mantine/core";
 import '@mantine/core/styles.css';        // 👈 must be imported
 import '@mantine/tiptap/styles.css';      // 👈 must be imported
 import './globals.css';
@@ -35,9 +34,9 @@ export default function RootLayout({
           <Providers>
             <ApolloWrapper>
               <ToastContainer />
-              <MantineProvider>
+              {/* <MantineProvider> */}
                 {children}
-              </MantineProvider>
+              {/* </MantineProvider> */}
             </ApolloWrapper>
           </Providers>
         </ThemeProvider>

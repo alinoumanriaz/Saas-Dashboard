@@ -1,26 +1,21 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { ChangeEvent, useEffect, useState, useMemo } from "react";
-import { useMutation, useLazyQuery } from "@apollo/client/react";
-import { useFormContext, Controller, useWatch } from "react-hook-form";
-import { z } from "zod";
-import dynamic from "next/dynamic";
-import Image from "next/image";
-import { FiX } from "react-icons/fi";
-import { toast } from "sonner";
-
-// shadcn/ui components
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-
-// Custom components
-import { DynamicForm, TabConfig } from "@/components/DynamicFormPopup";
-import GalleryModel from "./GalleryModel";
-
-// Helpers & GraphQL
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogHeader,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { Box, LoaderCircle, Search, Check, Info } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { generateSlug } from "@/helpers/slug-maker";
-import { removeTypename } from "@/helpers/removetypename";
+import { useLazyQuery, useMutation } from "@apollo/client/react";
 import {
   CHECK_MATERIAL_H1_TAG_UNIQUE,
   CHECK_MATERIAL_META_TITLE_UNIQUE,
@@ -28,128 +23,239 @@ import {
   CREATE_MATERIAL,
   UPDATE_MATERIAL,
 } from "@/graphql/current-website-queries/material.query";
+import {
+  FiCheckCircle,
+  FiEdit2,
+  FiFileText,
+  FiHelpCircle,
+  FiImage,
+  FiSettings,
+  FiTrash2,
+  FiUploadCloud,
+  FiX,
+  FiXCircle,
+  FiLayers,
+  FiGrid,
+  FiTag,
+} from "react-icons/fi";
+import z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import TiptopTextEditor from "@/components/TiptopTextEditor";
+import Image from "next/image";
+import WebsiteGalleryModel from "./WebsiteGallery.model";
+import { removeTypename } from "@/helpers/removetypename";
+import { toast } from "sonner";
 
-// Rich Text Editor (dynamic import)
-const TiptopEditor = dynamic(() => import("../../TiptopTextEditor"), { ssr: false });
-
-// ---------- Types ----------
-interface FAQItem {
-  __typename?: string;
-  question: string;
-  answer: string;
-  order: number;
-}
+/* ============================================================
+ * Constants & Types
+ * ============================================================ */
+const META_DESCRIPTION_MAX = 160;
+const ALT_TEXT_MAX = 125;
 
 interface ImageItem {
   url: string;
   alt: string;
 }
 
-// Zod schema for the form
-const materialSchema = z.object({
+interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+type ImageMode = "imageUrl" | "bannerImage" | "iconImageUrl";
+
+interface AddMaterialProps {
+  onCancel: () => void;
+  selectedData?: any;
+  isEditMode: boolean;
+  refetch?: () => void;
+}
+
+/* ============================================================
+ * Image normalisation — handles string | object | nested | array
+ * ============================================================ */
+const toImageItem = (input: any): ImageItem | null => {
+  if (!input) return null;
+  if (typeof input === "string") return { url: input, alt: "" };
+  if (typeof input === "object") {
+    if (input.image && (input.image.url || typeof input.image === "string")) {
+      return toImageItem(input.image);
+    }
+    if (input.url) return { url: input.url, alt: input.alt || "" };
+  }
+  return null;
+};
+
+const toSingleImage = (input: any): ImageItem | null => {
+  if (Array.isArray(input)) return toImageItem(input[0]);
+  return toImageItem(input);
+};
+
+/* ============================================================
+ * Zod Schema
+ * ============================================================ */
+const imageObjectSchema = z.object({
+  url: z.string().min(1, "Image is required"),
+  alt: z.string().max(ALT_TEXT_MAX).default(""),
+});
+
+const materialFormSchema = z.object({
   name: z.string().min(1, "Material name is required"),
   slug: z
     .string()
     .min(1, "Slug is required")
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-      message: "Slug can only contain lowercase letters, numbers, and hyphens",
+      message: "Lowercase letters, numbers, and hyphens only",
     }),
   h1Tag: z.string().min(1, "H1 Tag is required"),
   metaTitle: z.string().min(1, "Meta Title is required"),
   metaDescription: z.string().optional(),
-  description: z.string().optional(),
+  shortDescription: z.string().optional(),
   content: z.string().optional(),
+  imageUrl: imageObjectSchema.nullable().optional(), // single
+  bannerImage: imageObjectSchema.nullable().optional(), // single
+  iconImageUrl: imageObjectSchema.nullable().optional(), // single
+  faqs: z.array(z.any()).default([]),
+  status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
 });
 
-type FormValues = z.infer<typeof materialSchema>;
+type FormValues = z.infer<typeof materialFormSchema>;
 
-// Helper functions for image conversion
-const toSingleImage = (input: any): ImageItem | null => {
-  if (!input) return null;
-  if (typeof input === "string") return { url: input, alt: "" };
-  if (input.url) return { url: input.url, alt: input.alt || "" };
-  return null;
-};
+/* ============================================================
+ * Reusable inline UI helpers (mirror of AddProduct)
+ * ============================================================ */
+const FieldErrorMsg = ({ message }: { message?: string }) =>
+  message ? (
+    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-rose-600">
+      <FiXCircle className="size-3.5 shrink-0" />
+      {message}
+    </p>
+  ) : null;
 
-const toImageArray = (input: any): ImageItem[] => {
-  if (!input) return [];
-  if (Array.isArray(input)) return input;
-  if (typeof input === "string") return [{ url: input, alt: "" }];
-  if (input.url) return [{ url: input.url, alt: input.alt || "" }];
-  return [];
-};
+const Hint = ({ children }: { children: React.ReactNode }) => (
+  <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+    <Info className="size-3" /> {children}
+  </p>
+);
 
-// ---------- Subcomponent: Image Upload Card ----------
+const SectionHeader = ({
+  title,
+  desc,
+  icon,
+}: {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+}) => (
+  <div className="flex items-start gap-3 mb-4">
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-primary/90 ring-1 ring-indigo-100">
+      {icon}
+    </div>
+    <div>
+      <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+      <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+    </div>
+  </div>
+);
+
+const Section = ({ children }: { children: React.ReactNode }) => (
+  <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    {children}
+  </div>
+);
+
+const UniquenessResult = ({ status }: { status: string }) =>
+  status ? (
+    <p
+      className={`mt-1.5 flex items-center gap-1.5 text-xs font-medium ${status.startsWith("✓") ? "text-emerald-600" : "text-rose-600"
+        }`}
+    >
+      {status.startsWith("✓") ? (
+        <FiCheckCircle className="size-3.5 shrink-0" />
+      ) : (
+        <FiXCircle className="size-3.5 shrink-0" />
+      )}
+      {status.replace(/^[✓✗]\s*/, "")}
+    </p>
+  ) : null;
+
+/* ============================================================
+ * Reusable single-image uploader (with inline alt editing)
+ * ============================================================ */
 const ImageUploadCard = ({
   label,
-  imageUrl,
-  hasAlt,
-  onOpenGallery,
+  hint,
+  image,
+  aspect = "square",
+  onPick,
   onRemove,
 }: {
   label: string;
-  imageUrl: string;
-  hasAlt: boolean;
-  onOpenGallery: () => void;
+  hint?: string;
+  image: ImageItem | null | undefined;
+  aspect?: "square" | "banner" | "icon";
+  onPick: () => void;
   onRemove: () => void;
 }) => {
+  const container =
+    aspect === "banner"
+      ? "aspect-[3/1] w-full"
+      : aspect === "icon"
+        ? "size-24"
+        : "aspect-square w-full";
+
   return (
-    <div className="space-y-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
-      <label className="text-sm font-medium text-gray-700">{label}</label>
-      <div className="group relative">
-        <div
-          onClick={onOpenGallery}
-          className="relative cursor-pointer w-full aspect-square flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
-          role="button"
-          tabIndex={0}
-          onKeyUp={(e) => {
-            if (e.key === "Enter" || e.key === " ") onOpenGallery();
-          }}
-        >
-          {imageUrl ? (
-            <>
-              <Image
-                src={imageUrl}
-                alt="Material image"
-                fill
-                className="rounded-lg object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/60 transition-opacity rounded-lg">
-                <span className="text-xs text-white font-medium">Change</span>
-              </div>
-            </>
-          ) : (
-            <div className="text-center p-4">
-              <svg
-                className="mx-auto h-8 w-8 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <label className="text-xs font-medium text-slate-600">{label}</label>
+        {hint && <span className="text-[10px] text-slate-400">{hint}</span>}
+      </div>
+
+      <div
+        className={`group relative overflow-hidden rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 transition hover:border-indigo-400 ${container}`}
+      >
+        {image?.url ? (
+          <>
+            <Image
+              src={image.url}
+              alt={image.alt || label}
+              fill
+              className={
+                aspect === "icon"
+                  ? "object-contain p-2"
+                  : "object-cover"
+              }
+            />
+            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={onPick}
+                className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-slate-800 shadow hover:bg-white"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <p className="text-xs text-gray-500">Click to upload</p>
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={onRemove}
+                className="rounded-full bg-rose-500/90 px-3 py-1 text-[11px] font-medium text-white shadow hover:bg-rose-600"
+              >
+                Remove
+              </button>
             </div>
-          )}
-        </div>
-        {hasAlt && (
-          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-            Alt Text
-          </div>
-        )}
-        {imageUrl && (
+            {!image.alt && (
+              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-medium text-white">
+                Missing alt
+              </span>
+            )}
+          </>
+        ) : (
           <button
-            onClick={onRemove}
-            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600"
-            aria-label="Remove image"
+            type="button"
+            onClick={onPick}
+            className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-slate-400 transition hover:text-primary/90"
           >
-            <FiX className="size-3" />
+            <FiUploadCloud className="size-6" />
+            <span className="text-xs font-medium">Upload</span>
           </button>
         )}
       </div>
@@ -157,778 +263,1114 @@ const ImageUploadCard = ({
   );
 };
 
-// ---------- Tab Components ----------
-
-// 1. Basic Tab
-interface BasicTabProps {
-  isEditMode: boolean;
-  slugCheck: string;
-  checkingSlug: boolean;
-  checkSlugUnique: (slug: string) => void;
-}
-
-const BasicTab = ({ isEditMode, slugCheck, checkingSlug, checkSlugUnique }: BasicTabProps) => {
-  const { control, setValue, formState: { errors } } = useFormContext<FormValues>();
-  const name = useWatch({ control, name: "name" });
-  const slug = useWatch({ control, name: "slug" });
-  const [isSlugManual, setIsSlugManual] = useState(isEditMode);
-
-  // Auto-generate slug from name (only when not manually edited)
-  useEffect(() => {
-    if (!isSlugManual && name) {
-      const newSlug = generateSlug(name);
-      setValue("slug", newSlug, { shouldValidate: true, shouldDirty: true });
-    }
-  }, [name, isSlugManual, setValue]);
-
-  // Auto-fill h1Tag and metaTitle from name (only if empty)
-  const h1Tag = useWatch({ control, name: "h1Tag" });
-  const metaTitle = useWatch({ control, name: "metaTitle" });
-  useEffect(() => {
-    if (!h1Tag && name) setValue("h1Tag", name, { shouldValidate: true });
-    if (!metaTitle && name) setValue("metaTitle", name, { shouldValidate: true });
-  }, [name, h1Tag, metaTitle, setValue]);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-auto">
-      {/* Name */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Material Name *
-        </label>
-        <Controller
-          name="name"
-          control={control}
-          render={({ field }) => <Input placeholder="Enter material name" {...field} />}
-        />
-        {errors.name && <p className="text-sm text-red-600 mt-1">{errors.name.message}</p>}
-      </div>
-
-      {/* Slug */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Slug *
-        </label>
-        <div className="flex gap-2">
-          <Controller
-            name="slug"
-            control={control}
-            render={({ field }) => (
-              <Input
-                placeholder="material-slug"
-                {...field}
-                onFocus={() => setIsSlugManual(true)}
-                onBlur={() => {
-                  if (field.value === generateSlug(name)) {
-                    setIsSlugManual(false);
-                  }
-                }}
-              />
-            )}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => checkSlugUnique(slug)}
-            disabled={checkingSlug || !slug?.trim()}
-          >
-            {checkingSlug ? "Checking..." : "Check"}
-          </Button>
-        </div>
-        {slugCheck && (
-          <p className={`text-sm ${slugCheck.startsWith("✓") ? "text-green-600" : "text-red-600"}`}>
-            {slugCheck}
-          </p>
-        )}
-        {errors.slug && <p className="text-sm text-red-600 mt-1">{errors.slug.message}</p>}
-      </div>
-
-      {/* Description */}
-      <div className="md:col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Description
-        </label>
-        <Controller
-          name="description"
-          control={control}
-          render={({ field }) => (
-            <div className="border rounded-md">
-              <TiptopEditor
-                height="h-30"
-                initialValue={field.value}
-                onChange={(content: string) => field.onChange(content)}
-              />
-            </div>
-          )}
-        />
-        {errors.description && <p className="text-sm text-red-600 mt-1">{errors.description.message}</p>}
-      </div>
-    </div>
-  );
-};
-
-// 2. Meta Tab
-interface MetaTabProps {
-  h1TagCheck: string;
-  checkingH1Tag: boolean;
-  metaTitleCheck: string;
-  checkingMetaTitle: boolean;
-  checkH1TagUnique: (h1Tag: string) => void;
-  checkMetaTitleUnique: (metaTitle: string) => void;
-}
-
-const MetaTab = ({
-  h1TagCheck,
-  checkingH1Tag,
-  metaTitleCheck,
-  checkingMetaTitle,
-  checkH1TagUnique,
-  checkMetaTitleUnique,
-}: MetaTabProps) => {
-  const { control, formState: { errors } } = useFormContext<FormValues>();
-  const h1Tag = useWatch({ control, name: "h1Tag" });
-  const metaTitle = useWatch({ control, name: "metaTitle" });
-  const metaDescription = useWatch({ control, name: "metaDescription" });
-
-  return (
-    <Card>
-      <CardContent className="space-y-4 pt-4 max-h-96 overflow-auto">
-        {/* H1 Tag */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            H1 Tag *
-          </label>
-          <div className="flex gap-2">
-            <Controller
-              name="h1Tag"
-              control={control}
-              render={({ field }) => (
-                <Input placeholder="e.g., Web Development Services" {...field} />
-              )}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => checkH1TagUnique(h1Tag)}
-              disabled={checkingH1Tag || !h1Tag?.trim()}
-            >
-              {checkingH1Tag ? "Checking..." : "Check"}
-            </Button>
-          </div>
-          {h1TagCheck && (
-            <p className={`text-sm ${h1TagCheck.startsWith("✓") ? "text-green-600" : "text-red-600"}`}>
-              {h1TagCheck}
-            </p>
-          )}
-          {errors.h1Tag && <p className="text-sm text-red-600 mt-1">{errors.h1Tag.message}</p>}
-        </div>
-
-        {/* Meta Title */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Meta Title *
-          </label>
-          <div className="flex gap-2">
-            <Controller
-              name="metaTitle"
-              control={control}
-              render={({ field }) => (
-                <Input placeholder="e.g., Professional Web Development Services | Company" {...field} />
-              )}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => checkMetaTitleUnique(metaTitle)}
-              disabled={checkingMetaTitle || !metaTitle?.trim()}
-            >
-              {checkingMetaTitle ? "Checking..." : "Check"}
-            </Button>
-          </div>
-          {metaTitleCheck && (
-            <p className={`text-sm ${metaTitleCheck.startsWith("✓") ? "text-green-600" : "text-red-600"}`}>
-              {metaTitleCheck}
-            </p>
-          )}
-          {errors.metaTitle && <p className="text-sm text-red-600 mt-1">{errors.metaTitle.message}</p>}
-        </div>
-
-        {/* Meta Description */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Meta Description
-          </label>
-          <Controller
-            name="metaDescription"
-            control={control}
-            render={({ field }) => (
-              <Textarea
-                placeholder="Description for search engines (150-160 chars)"
-                rows={3}
-                {...field}
-              />
-            )}
-          />
-          <div className="flex justify-between mt-1">
-            <span className="text-sm text-gray-500">
-              Recommended: 150-160 characters
-            </span>
-            <span
-              className={`text-sm ${(metaDescription?.length || 0) > 160
-                  ? "text-red-500"
-                  : (metaDescription?.length || 0) > 150
-                    ? "text-yellow-500"
-                    : "text-green-500"
-                }`}
-            >
-              {metaDescription?.length || 0}/160
-            </span>
-          </div>
-          {errors.metaDescription && <p className="text-sm text-red-600 mt-1">{errors.metaDescription.message}</p>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// 3. Content Tab
-const ContentTab = () => {
-  const { control } = useFormContext<FormValues>();
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Detailed Content
-      </label>
-      <Controller
-        name="content"
-        control={control}
-        render={({ field }) => (
-          <div className="border rounded-md">
-            <TiptopEditor
-              height="h-75"
-              initialValue={field.value}
-              onChange={(content: string) => field.onChange(content)}
-            />
-          </div>
-        )}
-      />
-    </div>
-  );
-};
-
-// 4. Images Tab (unchanged)
-interface ImagesTabProps {
-  imageUrl: ImageItem[];
-  bannerImage: ImageItem | null;
-  iconImageUrl: ImageItem | null;
-  getImageUrl: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => string;
-  hasCustomAltText: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => boolean;
-  openGallery: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => void;
-  removeImage: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => void;
-}
-
-const ImagesTab = ({
-  imageUrl,
-  bannerImage,
-  iconImageUrl,
-  getImageUrl,
-  hasCustomAltText,
-  openGallery,
-  removeImage,
-}: ImagesTabProps) => {
-  return (
-    <div className="space-y-4 max-h-96 overflow-auto">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <ImageUploadCard
-          label="Profile Image (Gallery)"
-          imageUrl={getImageUrl("imageUrl")}
-          hasAlt={hasCustomAltText("imageUrl")}
-          onOpenGallery={() => openGallery("imageUrl")}
-          onRemove={() => removeImage("imageUrl")}
-        />
-        <ImageUploadCard
-          label="Banner Image"
-          imageUrl={getImageUrl("bannerImage")}
-          hasAlt={hasCustomAltText("bannerImage")}
-          onOpenGallery={() => openGallery("bannerImage")}
-          onRemove={() => removeImage("bannerImage")}
-        />
-        <ImageUploadCard
-          label="Icon Image"
-          imageUrl={getImageUrl("iconImageUrl")}
-          hasAlt={hasCustomAltText("iconImageUrl")}
-          onOpenGallery={() => openGallery("iconImageUrl")}
-          onRemove={() => removeImage("iconImageUrl")}
-        />
-      </div>
-      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-        <h3 className="text-sm font-medium text-blue-800 mb-2">
-          Image Guidelines
-        </h3>
-        <ul className="text-xs text-blue-600 space-y-1">
-          <li>• Profile Image: Square (1:1) – supports multiple images (UI shows first)</li>
-          <li>• Banner Image: Wide (3:1) recommended</li>
-          <li>• Icon Image: Simple, recognizable (SVG preferred)</li>
-          <li>• Supported formats: JPG, PNG, SVG, WebP</li>
-          <li>• Click to add/change, click × to remove</li>
-        </ul>
-      </div>
-    </div>
-  );
-};
-
-// 5. FAQs Tab (unchanged but with a small bug fix)
-interface FaqsTabProps {
-  faqs: FAQItem[];
-  currentFaq: FAQItem;
-  editingFaqIndex: number | null;
-  handleFaqChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  addOrUpdateFaq: () => void;
-  editFaq: (index: number) => void;
-  deleteFaq: (index: number) => void;
-  cancelEditFaq: () => void;
-}
-
-const FaqsTab = ({
-  faqs,
-  currentFaq,
-  editingFaqIndex,
-  handleFaqChange,
-  addOrUpdateFaq,
-  editFaq,
-  deleteFaq,
-  cancelEditFaq,
-}: FaqsTabProps) => {
-  return (
-    <div className="space-y-6 max-h-96 overflow-auto">
-      <Card>
-        <CardContent className="space-y-3 pt-4">
-          <h3 className="text-sm font-medium">
-            {editingFaqIndex !== null ? "Edit FAQ" : "Add New FAQ"}
-          </h3>
-          <Input
-            name="question"
-            value={currentFaq.question}
-            onChange={handleFaqChange}
-            placeholder="Question *"
-          />
-          <Textarea
-            name="answer"
-            value={currentFaq.answer}
-            onChange={handleFaqChange}
-            placeholder="Answer *"
-            rows={3}
-          />
-          <div className="flex gap-2">
-            <Button type="button" onClick={addOrUpdateFaq}>
-              {editingFaqIndex !== null ? "Update FAQ" : "Add FAQ"}
-            </Button>
-            {editingFaqIndex !== null && (
-              <Button type="button" variant="outline" onClick={cancelEditFaq}>
-                Cancel
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div>
-        <h3 className="text-sm font-medium mb-3">FAQs ({faqs.length})</h3>
-        {faqs.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border">
-            <p>No FAQs added yet.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {faqs.map((faq, index) => (
-              <Card key={index}>
-                <CardContent className="flex justify-between items-start pt-4">
-                  <div>
-                    <h4 className="font-medium">{faq.question}</h4>
-                    <p className="text-sm text-gray-600">{faq.answer}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => editFaq(index)}>
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-800"
-                      onClick={() => deleteFaq(index)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ---------- Main Component ----------
-interface AddMaterialProps {
-  onCancel: () => void;
-  selectedData?: any;
-  isEditMode?: boolean;
-  refetch?: () => void;
-}
-
+/* ============================================================
+ * Main Component
+ * ============================================================ */
 const AddMaterial = ({
   onCancel,
   selectedData,
   isEditMode = false,
   refetch,
 }: AddMaterialProps) => {
-  // ---------- Local state for images ----------
-  const [imageUrl, setImageUrl] = useState<ImageItem[]>(
-    toImageArray(selectedData?.imageUrl)
-  );
-  const [bannerImage, setBannerImage] = useState<ImageItem | null>(
-    toSingleImage(selectedData?.bannerImage)
-  );
-  const [iconImageUrl, setIconImageUrl] = useState<ImageItem | null>(
-    toSingleImage(selectedData?.iconImageUrl || selectedData?.iconName)
-  );
-
-  // ---------- Local state for FAQs ----------
-  const [faqs, setFaqs] = useState<FAQItem[]>(selectedData?.faqs || []);
-  const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
-  const [currentFaq, setCurrentFaq] = useState<FAQItem>({
-    question: "",
-    answer: "",
-    order: 0,
-  });
-
-  // ---------- Gallery modal state ----------
-  const [showGalleryOpen, setShowGalleryOpen] = useState(false);
-  const [galleryMode, setGalleryMode] = useState<
-    "imageUrl" | "bannerImage" | "iconImageUrl"
-  >("imageUrl");
-
-  // ---------- Unique check states ----------
+  /* ---------- Unique-check state ---------- */
+  const [isSlugManual, setIsSlugManual] = useState(isEditMode);
+  const [isH1Manual, setIsH1Manual] = useState(isEditMode);
+  const [isMetaTitleManual, setIsMetaTitleManual] = useState(isEditMode);
   const [slugCheck, setSlugCheck] = useState("");
   const [h1TagCheck, setH1TagCheck] = useState("");
   const [metaTitleCheck, setMetaTitleCheck] = useState("");
 
-  // ---------- GraphQL queries for uniqueness ----------
-  const [checkSlug, { loading: checkingSlug, data: slugData, error: slugError }] =
-    useLazyQuery<any>(CHECK_MATERIAL_SLUG_UNIQUE);
-  const [checkH1Tag, { loading: checkingH1Tag, data: h1TagData, error: h1TagError }] =
-    useLazyQuery<any>(CHECK_MATERIAL_H1_TAG_UNIQUE);
-  const [checkMetaTitle, { loading: checkingMetaTitle, data: metaTitleData, error: metaTitleError }] =
-    useLazyQuery<any>(CHECK_MATERIAL_META_TITLE_UNIQUE);
+  /* ---------- Gallery & alt edit ---------- */
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryMode, setGalleryMode] = useState<ImageMode>("imageUrl");
+  // sentinel: "imageUrl" | "bannerImage" | "iconImageUrl" | null
+  const [editingAltOf, setEditingAltOf] = useState<ImageMode | null>(null);
+  const [altInput, setAltInput] = useState("");
 
-  // Update check feedback when data arrives
+  /* ---------- FAQs ---------- */
+  const [currentFaq, setCurrentFaq] = useState<FaqItem>({
+    question: "",
+    answer: "",
+  });
+  const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
+
+
+  /* ---------- Form ---------- */
+  const {
+    control,
+    watch,
+    setValue,
+    reset,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(materialFormSchema),
+    defaultValues: {
+      name: selectedData?.name || "",
+      slug: selectedData?.slug || "",
+      h1Tag: selectedData?.h1Tag || "",
+      metaTitle: selectedData?.metaTitle || "",
+      metaDescription: selectedData?.metaDescription || "",
+      shortDescription: selectedData?.shortDescription || "",
+      content: selectedData?.content || "",
+      imageUrl: toSingleImage(selectedData?.imageUrl),
+      bannerImage: toSingleImage(selectedData?.bannerImage),
+      iconImageUrl: toSingleImage(
+        selectedData?.iconImageUrl || selectedData?.iconName
+      ),
+      faqs: selectedData?.faqs || [],
+      status: selectedData?.status || "DRAFT",
+    },
+  });
+
+  // Rehydrate when selectedData arrives late (async parent fetch)
+  useEffect(() => {
+    if (!selectedData) return;
+    reset({
+      name: selectedData.name || "",
+      slug: selectedData.slug || "",
+      h1Tag: selectedData.h1Tag || "",
+      metaTitle: selectedData.metaTitle || "",
+      metaDescription: selectedData.metaDescription || "",
+      shortDescription: selectedData.shortDescription || "",
+      content: selectedData.content || "",
+      imageUrl: toSingleImage(selectedData.imageUrl),
+      bannerImage: toSingleImage(selectedData.bannerImage),
+      iconImageUrl: toSingleImage(
+        selectedData.iconImageUrl || selectedData.iconName
+      ),
+      faqs: selectedData.faqs || [],
+      status: selectedData.status || "DRAFT",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedData?.id]);
+
+  const name = watch("name");
+  const slug = watch("slug");
+  const h1Tag = watch("h1Tag");
+  const metaTitle = watch("metaTitle");
+  const metaDescription = watch("metaDescription");
+  const descLength = metaDescription?.length ?? 0;
+  const descTone =
+    descLength > META_DESCRIPTION_MAX
+      ? "text-rose-500"
+      : descLength > 150
+        ? "text-amber-500"
+        : "text-emerald-600";
+
+  const imageUrl = watch("imageUrl");
+  const bannerImage = watch("bannerImage");
+  const iconImageUrl = watch("iconImageUrl");
+  const faqs = watch("faqs") ?? [];
+
+  /* ---------- Queries ---------- */
+  const [
+    checkSlug,
+    { loading: checkingSlug, data: slugData, error: slugError },
+  ] = useLazyQuery<any>(CHECK_MATERIAL_SLUG_UNIQUE, {
+    fetchPolicy: "network-only",
+  });
+  const [
+    checkH1Tag,
+    { loading: checkingH1Tag, data: h1TagData, error: h1TagError },
+  ] = useLazyQuery<any>(CHECK_MATERIAL_H1_TAG_UNIQUE, {
+    fetchPolicy: "network-only",
+  });
+  const [
+    checkMetaTitle,
+    { loading: checkingMetaTitle, data: metaTitleData, error: metaTitleError },
+  ] = useLazyQuery<any>(CHECK_MATERIAL_META_TITLE_UNIQUE, {
+    fetchPolicy: "network-only",
+  });
+
   useEffect(() => {
     if (slugData?.checkMaterialSlugUnique) {
-      const isUnique = slugData.checkMaterialSlugUnique.isUnique;
-      setSlugCheck(isUnique ? "✓ Slug is available" : "✗ Slug is already taken");
+      setSlugCheck(
+        slugData.checkMaterialSlugUnique.isUnique
+          ? "✓ Slug is available"
+          : "✗ Slug is already taken"
+      );
     }
     if (slugError) toast.error("Failed to check slug availability");
   }, [slugData, slugError]);
 
   useEffect(() => {
     if (h1TagData?.checkMaterialH1TagUnique) {
-      const isUnique = h1TagData.checkMaterialH1TagUnique.isUnique;
-      setH1TagCheck(isUnique ? "✓ H1 Tag is available" : "✗ H1 Tag is already taken");
+      setH1TagCheck(
+        h1TagData.checkMaterialH1TagUnique.isUnique
+          ? "✓ H1 Tag is available"
+          : "✗ H1 Tag is already taken"
+      );
     }
-    if (h1TagError) toast.error("Failed to check H1 Tag availability");
+    if (h1TagError) toast.error("Failed to check H1 Tag");
   }, [h1TagData, h1TagError]);
 
   useEffect(() => {
     if (metaTitleData?.checkMaterialMetaTitleUnique) {
-      const isUnique = metaTitleData.checkMaterialMetaTitleUnique.isUnique;
-      setMetaTitleCheck(isUnique ? "✓ Meta Title is available" : "✗ Meta Title is already taken");
+      setMetaTitleCheck(
+        metaTitleData.checkMaterialMetaTitleUnique.isUnique
+          ? "✓ Meta Title is available"
+          : "✗ Meta Title is already taken"
+      );
     }
-    if (metaTitleError) toast.error("Failed to check Meta Title availability");
+    if (metaTitleError) toast.error("Failed to check Meta Title");
   }, [metaTitleData, metaTitleError]);
 
-  // ---------- Mutations ----------
-  const [createMaterial, { loading: createLoading }] = useMutation<any>(CREATE_MATERIAL);
-  const [updateMaterial, { loading: updateLoading }] = useMutation<any>(UPDATE_MATERIAL);
+  /* ---------- Mutations ---------- */
+  const [createMaterial, { loading: createLoading }] =
+    useMutation<any>(CREATE_MATERIAL);
+  const [updateMaterial, { loading: updateLoading }] =
+    useMutation<any>(UPDATE_MATERIAL);
   const isSubmitting = createLoading || updateLoading;
 
-  // ---------- Default values for the form ----------
-  const defaultValues = useMemo<FormValues>(
-    () => ({
-      name: selectedData?.name || "",
-      slug: selectedData?.slug || "",
-      h1Tag: selectedData?.h1Tag || "",
-      metaTitle: selectedData?.metaTitle || "",
-      metaDescription: selectedData?.metaDescription || "",
-      description: selectedData?.description || "",
-      content: selectedData?.content || "",
-    }),
-    [selectedData]
-  );
-
-  // ---------- Handlers for unique checks ----------
-  const checkSlugUnique = (slug: string) => {
-    if (!slug?.trim()) {
-      toast.error("Please enter a slug first");
+  /* ---------- Unique check handlers ---------- */
+  const checkSlugUnique = (s: string) => {
+    if (!s?.trim()) {
+      toast.error("Please enter a slug");
       return;
     }
+    setSlugCheck("");
     checkSlug({
       variables: {
-        slug,
+        slug: s,
         excludeId: isEditMode ? selectedData?.id : undefined,
       },
     });
   };
-
-  const checkH1TagUnique = (h1Tag: string) => {
-    if (!h1Tag?.trim()) {
-      toast.error("Please enter an H1 tag first");
+  const checkH1TagUnique = (h: string) => {
+    if (!h?.trim()) {
+      toast.error("Please enter an H1 tag");
       return;
     }
+    setH1TagCheck("");
     checkH1Tag({
       variables: {
-        h1Tag,
+        h1Tag: h,
         excludeId: isEditMode ? selectedData?.id : undefined,
       },
     });
   };
-
-  const checkMetaTitleUnique = (metaTitle: string) => {
-    if (!metaTitle?.trim()) {
-      toast.error("Please enter a meta title first");
+  const checkMetaTitleUnique = (m: string) => {
+    if (!m?.trim()) {
+      toast.error("Please enter a meta title");
       return;
     }
+    setMetaTitleCheck("");
     checkMetaTitle({
       variables: {
-        metaTitle,
+        metaTitle: m,
         excludeId: isEditMode ? selectedData?.id : undefined,
       },
     });
   };
 
-  // ---------- FAQ handlers ----------
+  /* ---------- Submit ---------- */
+  const onSubmit = async (values: FormValues) => {
+    const clean = removeTypename(values);
+
+    // Ensure all image fields are pure { url, alt } objects
+    const payload = {
+      ...clean,
+      imageUrl: clean.imageUrl
+        ? { url: clean.imageUrl.url, alt: clean.imageUrl.alt || "" }
+        : null,
+      bannerImage: clean.bannerImage
+        ? { url: clean.bannerImage.url, alt: clean.bannerImage.alt || "" }
+        : null,
+      iconImageUrl: clean.iconImageUrl
+        ? { url: clean.iconImageUrl.url, alt: clean.iconImageUrl.alt || "" }
+        : null,
+    };
+
+    try {
+      if (isEditMode && selectedData?.id) {
+        const result = await updateMaterial({
+          variables: { id: selectedData.id, input: payload },
+        });
+        if (result.data?.updateMaterial?.success) {
+          toast.success(
+            result.data.updateMaterial.message || "Material updated"
+          );
+          refetch?.();
+          onCancel();
+        } else {
+          toast.error(result.data?.updateMaterial?.message || "Update failed");
+        }
+      } else {
+        const result = await createMaterial({ variables: { input: payload } });
+        if (result.data?.createMaterial?.success) {
+          toast.success(
+            result.data.createMaterial.message || "Material created"
+          );
+          refetch?.();
+          onCancel();
+        } else {
+          toast.error(result.data?.createMaterial?.message || "Creation failed");
+        }
+      }
+    } catch (error: any) {
+      toast.error(error?.message || "Operation failed. Please try again.");
+    }
+  };
+
+  /* ---------- Image handlers ---------- */
+  const openGallery = (mode: ImageMode) => {
+    setGalleryMode(mode);
+    setShowGallery(true);
+  };
+  const handleGalleryClose = () => setShowGallery(false);
+
+  const handleGallerySelect = (selected: any[]) => {
+    setShowGallery(false);
+    if (!selected?.length) return;
+    const item = toImageItem(selected[0]);
+    if (!item?.url) {
+      toast.error("Selected image has no URL");
+      return;
+    }
+    setValue(galleryMode, item, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  const removeImage = (mode: ImageMode) =>
+    setValue(mode, null, { shouldValidate: true, shouldDirty: true });
+
+  const startEditAlt = (mode: ImageMode) => {
+    setEditingAltOf(mode);
+    const current =
+      mode === "imageUrl"
+        ? imageUrl
+        : mode === "bannerImage"
+          ? bannerImage
+          : iconImageUrl;
+    setAltInput(current?.alt ?? "");
+  };
+  const cancelEditAlt = () => {
+    setEditingAltOf(null);
+    setAltInput("");
+  };
+  const saveAlt = () => {
+    if (!editingAltOf) return;
+    const current =
+      editingAltOf === "imageUrl"
+        ? imageUrl
+        : editingAltOf === "bannerImage"
+          ? bannerImage
+          : iconImageUrl;
+    if (!current) {
+      cancelEditAlt();
+      return;
+    }
+    setValue(
+      editingAltOf,
+      { ...current, alt: altInput.trim() },
+      { shouldValidate: true, shouldDirty: true }
+    );
+    cancelEditAlt();
+  };
+
+  /* ---------- Validation summary ---------- */
+  const validation = {
+    hasPrimary: !!imageUrl?.url,
+    hasAlt:
+      !!imageUrl?.alt?.trim() ||
+      !!bannerImage?.alt?.trim() ||
+      !!iconImageUrl?.alt?.trim(),
+    slotsFilled: [imageUrl, bannerImage, iconImageUrl].filter((i) => !!i?.url)
+      .length,
+  };
+  const checks = [
+    { label: "Primary image set", ok: validation.hasPrimary },
+    {
+      label: "Alt text added",
+      ok: validation.hasAlt,
+    },
+    {
+      label: "Optional slots filled",
+      ok: validation.slotsFilled >= 2,
+    },
+  ];
+
+  /* ---------- FAQ handlers ---------- */
   const handleFaqChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setCurrentFaq((prev) => ({ ...prev, [name]: value }));
   };
-
   const addOrUpdateFaq = () => {
-    if (!currentFaq.question.trim() || !currentFaq.answer.trim()) {
-      toast.error("Both question and answer are required");
+    const q = currentFaq.question.trim();
+    const a = currentFaq.answer.trim();
+    if (!q) {
+      toast.error("FAQ question is required");
       return;
     }
+    if (!a) {
+      toast.error("FAQ answer is required");
+      return;
+    }
+    const cur = faqs ?? [];
     if (editingFaqIndex !== null) {
-      const updatedFaqs = [...faqs];
-      updatedFaqs[editingFaqIndex] = { ...currentFaq, order: editingFaqIndex };
-      setFaqs(updatedFaqs);
-      setEditingFaqIndex(null);
+      setValue(
+        "faqs",
+        cur.map((f, i) =>
+          i === editingFaqIndex ? { question: q, answer: a } : f
+        ),
+        { shouldValidate: true, shouldDirty: true }
+      );
+      toast.success("FAQ updated");
     } else {
-      setFaqs([...faqs, { ...currentFaq, order: faqs.length }]);
+      setValue("faqs", [...cur, { question: q, answer: a }], {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      toast.success("FAQ added");
     }
-    setCurrentFaq({ question: "", answer: "", order: faqs.length });
+    setCurrentFaq({ question: "", answer: "" });
+    setEditingFaqIndex(null);
   };
-
-  const editFaq = (index: number) => {
-    setCurrentFaq(faqs[index]);
-    setEditingFaqIndex(index);
+  const editFaq = (i: number) => {
+    const f = faqs?.[i];
+    if (!f) return;
+    setCurrentFaq({ question: f.question, answer: f.answer });
+    setEditingFaqIndex(i);
   };
-
-  const deleteFaq = (index: number) => {
-    const updatedFaqs = faqs.filter((_, i) => i !== index);
-    const reorderedFaqs = updatedFaqs.map((faq, i) => ({ ...faq, order: i }));
-    setFaqs(reorderedFaqs);
-    if (editingFaqIndex === index) {
+  const deleteFaq = (i: number) => {
+    setValue(
+      "faqs",
+      (faqs ?? []).filter((_, idx) => idx !== i),
+      { shouldValidate: true, shouldDirty: true }
+    );
+    if (editingFaqIndex === i) {
       setEditingFaqIndex(null);
-      setCurrentFaq({ question: "", answer: "", order: reorderedFaqs.length });
-    } else if (editingFaqIndex !== null && editingFaqIndex > index) {
-      // If the edited item was after the deleted one, shift its index
-      setEditingFaqIndex(editingFaqIndex - 1);
+      setCurrentFaq({ question: "", answer: "" });
     }
   };
-
   const cancelEditFaq = () => {
     setEditingFaqIndex(null);
-    setCurrentFaq({ question: "", answer: "", order: faqs.length });
+    setCurrentFaq({ question: "", answer: "" });
   };
 
-  // ---------- Gallery handlers ----------
-  const galleryCloseHandler = () => setShowGalleryOpen(false);
+  /* ============================================================
+   * Tab layout
+   * ============================================================ */
+  const [activeTab, setActiveTab] = useState<
+    "basic" | "content" | "media" | "details"
+  >("basic");
 
-  const handleSelectedImage = (images: any[]) => {
-    if (images.length === 0) {
-      if (galleryMode === "imageUrl") setImageUrl([]);
-      else if (galleryMode === "bannerImage") setBannerImage(null);
-      else setIconImageUrl(null);
-    } else {
-      const selected = images[0];
-      const newImage = { url: selected.url, alt: selected.alt || "" };
-      if (galleryMode === "imageUrl") setImageUrl([newImage]);
-      else if (galleryMode === "bannerImage") setBannerImage(newImage);
-      else setIconImageUrl(newImage);
-    }
-    setShowGalleryOpen(false);
-  };
+  const tabs: {
+    id: typeof activeTab;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+      { id: "basic", label: "Basics", icon: <Box className="size-4" /> },
+      {
+        id: "content",
+        label: "Content & SEO",
+        icon: <FiFileText className="size-4" />,
+      },
+      { id: "media", label: "Media", icon: <FiImage className="size-4" /> },
+      {
+        id: "details",
+        label: "Details & Settings",
+        icon: <FiLayers className="size-4" />,
+      },
+    ];
 
-  const openGallery = (
-    mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-  ) => {
-    setGalleryMode(mode);
-    setShowGalleryOpen(true);
-  };
-
-  const removeImage = (
-    mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-  ) => {
-    if (mode === "imageUrl") setImageUrl([]);
-    else if (mode === "bannerImage") setBannerImage(null);
-    else setIconImageUrl(null);
-  };
-
-  const getImageUrl = (
-    mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-  ): string => {
-    if (mode === "imageUrl") return imageUrl.length > 0 ? imageUrl[0].url : "";
-    const img = mode === "bannerImage" ? bannerImage : iconImageUrl;
-    return img?.url || "";
-  };
-
-  const hasCustomAltText = (
-    mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-  ): boolean => {
-    if (mode === "imageUrl") return imageUrl.length > 0 && !!imageUrl[0].alt;
-    const img = mode === "bannerImage" ? bannerImage : iconImageUrl;
-    return !!img?.alt;
-  };
-
-  // ---------- Form submission ----------
-  const onSubmit = async (values: FormValues) => {
-    const inputData = {
-      ...values,
-      imageUrl: imageUrl.length > 0 ? imageUrl : null,
-      bannerImage,
-      iconImageUrl,
-      faqs,
-    };
-    const cleanInputData = removeTypename(inputData);
-
-    console.log({cleanInputData:cleanInputData})
-
-    try {
-      let result;
-      if (isEditMode && selectedData?.id) {
-        result = await updateMaterial({
-          variables: { id: selectedData.id, input: cleanInputData },
-        });
-        if (result.data?.updateMaterial?.success) {
-          toast.success(result.data.updateMaterial.message || "Material updated successfully");
-        } else {
-          toast.error(result.data?.updateMaterial?.message || "Failed to update material");
-        }
-      } else {
-        result = await createMaterial({ variables: { input: cleanInputData } });
-        if (result.data?.createMaterial?.success) {
-          toast.success(result.data.createMaterial.message || "Material created successfully");
-        } else {
-          toast.error(result.data?.createMaterial?.message || "Failed to create material");
-        }
-      }
-      if (refetch) refetch();
-      onCancel();
-    } catch (error: any) {
-      console.error("GraphQL Error:", error);
-      toast.error(error.message || "Operation failed");
-    }
-  };
-
-  // ---------- Build Tabs Array ----------
-  const tabs: TabConfig[] = [
-    {
-      id: "basic",
-      label: "Basic",
-      content: (
-        <BasicTab
-          isEditMode={isEditMode}
-          slugCheck={slugCheck}
-          checkingSlug={checkingSlug}
-          checkSlugUnique={checkSlugUnique}
+  /* ============================================================
+   * Render helpers for the media tab
+   * ============================================================ */
+  const renderAltEditor = (mode: ImageMode) => {
+    const current =
+      mode === "imageUrl"
+        ? imageUrl
+        : mode === "bannerImage"
+          ? bannerImage
+          : iconImageUrl;
+    if (editingAltOf !== mode || !current) return null;
+    return (
+      <div className="absolute inset-0 flex flex-col bg-slate-900/90 p-2">
+        <Textarea
+          value={altInput}
+          onChange={(e) => setAltInput(e.target.value)}
+          placeholder="Describe this image"
+          className="flex-1 resize-none rounded border border-slate-500 bg-transparent p-1.5 text-xs text-white placeholder:text-slate-400"
+          maxLength={ALT_TEXT_MAX}
+          autoFocus
         />
-      ),
-    },
-    {
-      id: "meta",
-      label: "Meta",
-      content: (
-        <MetaTab
-          h1TagCheck={h1TagCheck}
-          checkingH1Tag={checkingH1Tag}
-          metaTitleCheck={metaTitleCheck}
-          checkingMetaTitle={checkingMetaTitle}
-          checkH1TagUnique={checkH1TagUnique}
-          checkMetaTitleUnique={checkMetaTitleUnique}
-        />
-      ),
-    },
-    {
-      id: "content",
-      label: "Content",
-      content: <ContentTab />,
-    },
-    {
-      id: "images",
-      label: "Images",
-      content: (
-        <ImagesTab
-          imageUrl={imageUrl}
-          bannerImage={bannerImage}
-          iconImageUrl={iconImageUrl}
-          getImageUrl={getImageUrl}
-          hasCustomAltText={hasCustomAltText}
-          openGallery={openGallery}
-          removeImage={removeImage}
-        />
-      ),
-    },
-    {
-      id: "faqs",
-      label: "FAQs",
-      content: (
-        <FaqsTab
-          faqs={faqs}
-          currentFaq={currentFaq}
-          editingFaqIndex={editingFaqIndex}
-          handleFaqChange={handleFaqChange}
-          addOrUpdateFaq={addOrUpdateFaq}
-          editFaq={editFaq}
-          deleteFaq={deleteFaq}
-          cancelEditFaq={cancelEditFaq}
-        />
-      ),
-    },
-  ];
+        <div className="mt-1 flex items-center justify-between">
+          <span className="text-[10px] text-slate-300">
+            {altInput.length}/{ALT_TEXT_MAX}
+          </span>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={saveAlt}
+              className="rounded bg-emerald-500 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-600"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={cancelEditAlt}
+              className="rounded bg-slate-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-slate-500"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-  // ---------- Render ----------
+  const renderImageCard = (mode: ImageMode, label: string) => {
+    const img =
+      mode === "imageUrl"
+        ? imageUrl
+        : mode === "bannerImage"
+          ? bannerImage
+          : iconImageUrl;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs font-medium text-slate-600">{label}</span>
+          {img?.url && (
+            <button
+              type="button"
+              onClick={() => startEditAlt(mode)}
+              className="text-[10px] font-medium text-primary/90 hover:underline"
+            >
+              {img.alt ? "Edit alt" : "Add alt"}
+            </button>
+          )}
+        </div>
+
+        <div className="group relative aspect-square w-full overflow-hidden rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 transition hover:border-indigo-400">
+          {img?.url ? (
+            <>
+              <Image
+                src={img.url}
+                alt={img.alt || label}
+                fill
+                className="object-cover"
+              />
+              {editingAltOf === mode ? (
+                renderAltEditor(mode)
+              ) : (
+                <>
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => openGallery(mode)}
+                      className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-slate-800 shadow hover:bg-white"
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeImage(mode)}
+                      className="rounded-full bg-rose-500/90 px-3 py-1 text-[11px] font-medium text-white shadow hover:bg-rose-600"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {img.alt ? (
+                    <button
+                      type="button"
+                      onClick={() => startEditAlt(mode)}
+                      className="absolute inset-x-0 bottom-0 truncate bg-black/60 p-1.5 text-left text-[11px] text-white hover:bg-black/75"
+                      title="Edit alt text"
+                    >
+                      {img.alt}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEditAlt(mode)}
+                      className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-medium text-white shadow-md hover:bg-amber-600"
+                    >
+                      <FiEdit2 className="size-3" /> Add alt text
+                    </button>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openGallery(mode)}
+              className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-slate-400 transition hover:text-primary/90"
+            >
+              <FiUploadCloud className="size-7" />
+              <span className="text-xs font-medium">Add image</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  /* ============================================================
+   * Render
+   * ============================================================ */
   return (
     <>
-      <DynamicForm<FormValues>
-        open={true}
-        onOpenChange={onCancel}
-        title={isEditMode ? "Edit Material" : "Add New Material"}
-        tabs={tabs}
-        defaultValues={defaultValues}
-        validationSchema={materialSchema}
-        onSubmit={onSubmit}
-        isSubmitting={isSubmitting}
-        submitLabel={isEditMode ? "Update Material" : "Create Material"}
-      />
+      <Dialog open={true} onOpenChange={() => onCancel()}>
+        <DialogContent className="max-w-6xl! p-0 overflow-hidden bg-slate-50">
+          {/* ============ Header ============ */}
+          <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-white">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-md shadow-indigo-500/30">
+                  <FiGrid size={20} strokeWidth={1.8} />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-bold text-slate-900">
+                    {isEditMode ? "Edit Material" : "Add New Material"}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    {isEditMode
+                      ? "Update material details and metadata."
+                      : "Fill in the sections below. Required fields marked with *"}
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
 
-      {showGalleryOpen && (
-        <GalleryModel
-          onCancel={galleryCloseHandler}
-          onSentSelected={handleSelectedImage}
+            {/* Tabs */}
+            <div className="flex items-center gap-1 mt-4 -mb-4 overflow-x-auto">
+              {tabs.map((t) => {
+                const active = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveTab(t.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${active
+                        ? "border-indigo-500 text-primary/90"
+                        : "border-transparent text-slate-500 hover:text-slate-800"
+                      }`}
+                  >
+                    {t.icon} {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </DialogHeader>
+
+          {/* ============ Body ============ */}
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col">
+            <ScrollArea className="h-[calc(90vh-220px)]">
+              <div className="px-6 py-5 space-y-5">
+                {/* ---------- BASIC ---------- */}
+                {activeTab === "basic" && (
+                  <div className="space-y-5">
+                    <Section>
+                      <SectionHeader
+                        title="Material Identity"
+                        desc="The name, URL slug, and short summary for this material."
+                        icon={<Box className="size-4" />}
+                      />
+                      <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
+                        <div>
+                          <FieldLabel htmlFor="material-name">
+                            Material name{" "}
+                            <span className="text-rose-500">*</span>
+                          </FieldLabel>
+                          <Controller
+                            name="name"
+                            control={control}
+                            render={({ field }) => (
+                              <Input
+                                id="material-name"
+                                placeholder="e.g., Web Development"
+                                {...field}
+                                className="mt-1"
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  if (!isSlugManual)
+                                    setValue(
+                                      "slug",
+                                      generateSlug(e.target.value),
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                }}
+                              />
+                            )}
+                          />
+                          <FieldErrorMsg message={errors.name?.message} />
+                        </div>
+
+                        <div>
+                          <FieldLabel htmlFor="material-slug">
+                            Slug <span className="text-rose-500">*</span>
+                          </FieldLabel>
+                          <div className="flex gap-2 mt-1">
+                            <Controller
+                              name="slug"
+                              control={control}
+                              render={({ field }) => (
+                                <Input
+                                  id="material-slug"
+                                  placeholder="material-slug"
+                                  {...field}
+                                  onFocus={() => setIsSlugManual(true)}
+                                  onBlur={() => {
+                                    if (
+                                      field.value === generateSlug(name ?? "")
+                                    )
+                                      setIsSlugManual(false);
+                                  }}
+                                />
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => checkSlugUnique(slug)}
+                              disabled={checkingSlug || !slug?.trim()}
+                              className="shrink-0 bg-primary/90 text-white hover:bg-primary"
+                            >
+                              {checkingSlug ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                "Check"
+                              )}
+                            </Button>
+                          </div>
+                          <UniquenessResult status={slugCheck} />
+                          <FieldErrorMsg message={errors.slug?.message} />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <FieldLabel htmlFor="material-short-desc">
+                            Short description
+                          </FieldLabel>
+                          <Controller
+                            name="shortDescription"
+                            control={control}
+                            render={({ field }) => (
+                              <Textarea
+                                id="material-short-desc"
+                                rows={2}
+                                placeholder="A concise summary for listing pages"
+                                className="mt-1"
+                                {...field}
+                              />
+                            )}
+                          />
+                          <Hint>
+                            Appears in listings. Keep it under 120 characters.
+                          </Hint>
+                        </div>
+                      </div>
+                    </Section>
+
+                    <Section>
+                      <SectionHeader
+                        title="Search Engine Optimization"
+                        desc="Help people find your material on search engines."
+                        icon={<Search className="size-4" />}
+                      />
+                      <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
+                        <div>
+                          <FieldLabel htmlFor="material-h1">
+                            H1 tag <span className="text-rose-500">*</span>
+                          </FieldLabel>
+                          <div className="flex gap-2 mt-1">
+                            <Controller
+                              name="h1Tag"
+                              control={control}
+                              render={({ field }) => (
+                                <Input
+                                  id="material-h1"
+                                  placeholder="e.g., Professional Web Development Services"
+                                  {...field}
+                                  onFocus={() => setIsH1Manual(true)}
+                                  onBlur={() => {
+                                    if (field.value === (name ?? ""))
+                                      setIsH1Manual(false);
+                                  }}
+                                />
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => checkH1TagUnique(h1Tag)}
+                              disabled={checkingH1Tag || !h1Tag?.trim()}
+                              className="shrink-0 bg-primary/90 text-white hover:bg-primary"
+                            >
+                              {checkingH1Tag ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                "Check"
+                              )}
+                            </Button>
+                          </div>
+                          <UniquenessResult status={h1TagCheck} />
+                          <FieldErrorMsg message={errors.h1Tag?.message} />
+                        </div>
+
+                        <div>
+                          <FieldLabel htmlFor="meta-title">
+                            Meta title{" "}
+                            <span className="text-rose-500">*</span>
+                          </FieldLabel>
+                          <div className="flex gap-2 mt-1">
+                            <Controller
+                              name="metaTitle"
+                              control={control}
+                              render={({ field }) => (
+                                <Input
+                                  id="meta-title"
+                                  placeholder="e.g., Web Development Services | Your Company"
+                                  {...field}
+                                  onFocus={() => setIsMetaTitleManual(true)}
+                                  onBlur={() => {
+                                    if (field.value === (name ?? ""))
+                                      setIsMetaTitleManual(false);
+                                  }}
+                                />
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => checkMetaTitleUnique(metaTitle)}
+                              disabled={checkingMetaTitle || !metaTitle?.trim()}
+                              className="shrink-0 bg-primary/90 text-white hover:bg-primary"
+                            >
+                              {checkingMetaTitle ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                "Check"
+                              )}
+                            </Button>
+                          </div>
+                          <UniquenessResult status={metaTitleCheck} />
+                          <FieldErrorMsg message={errors.metaTitle?.message} />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <div className="mb-1.5 flex items-baseline justify-between">
+                            <FieldLabel htmlFor="material-meta-desc">
+                              Meta description
+                            </FieldLabel>
+                            <span
+                              className={`text-xs font-medium ${descTone}`}
+                            >
+                              {descLength}/{META_DESCRIPTION_MAX}
+                            </span>
+                          </div>
+                          <Controller
+                            name="metaDescription"
+                            control={control}
+                            render={({ field }) => (
+                              <Textarea
+                                id="material-meta-desc"
+                                rows={3}
+                                placeholder="Summarize the material for search engines, ideally 150-160 characters"
+                                {...field}
+                              />
+                            )}
+                          />
+                          <Hint>
+                            Appears in Google search results under the title.
+                          </Hint>
+                          <FieldErrorMsg
+                            message={errors.metaDescription?.message}
+                          />
+                        </div>
+                      </div>
+                    </Section>
+                  </div>
+                )}
+
+                {/* ---------- CONTENT ---------- */}
+                {activeTab === "content" && (
+                  <div className="space-y-5">
+                    <Section>
+                      <SectionHeader
+                        title="Detailed Content"
+                        desc="Long-form content that supports this material."
+                        icon={<FiGrid className="size-4" />}
+                      />
+                      <Controller
+                        name="content"
+                        control={control}
+                        render={({ field }) => (
+                          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                            <TiptopTextEditor
+                              height="h-72"
+                              initialValue={field.value}
+                              onChange={field.onChange}
+                            />
+                          </div>
+                        )}
+                      />
+                    </Section>
+                  </div>
+                )}
+
+                {/* ---------- MEDIA ---------- */}
+                {activeTab === "media" && (
+                  <div className="space-y-5">
+                    <Section>
+                      <SectionHeader
+                        title="Material Images"
+                        desc="Each slot takes a single image. Add alt text for accessibility and SEO."
+                        icon={<FiImage className="size-4" />}
+                      />
+
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                        {renderImageCard("imageUrl", "Primary image")}
+                        {renderImageCard("bannerImage", "Banner image")}
+                        {renderImageCard("iconImageUrl", "Icon image")}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                        {checks.map((c) => (
+                          <span
+                            key={c.label}
+                            className={`flex items-center gap-1.5 text-xs font-medium ${c.ok ? "text-emerald-600" : "text-rose-600"
+                              }`}
+                          >
+                            {c.ok ? (
+                              <FiCheckCircle className="size-3.5" />
+                            ) : (
+                              <FiXCircle className="size-3.5" />
+                            )}
+                            {c.label}
+                          </span>
+                        ))}
+                        <span className="ml-auto text-xs text-slate-400">
+                          {validation.slotsFilled}/3 slots filled
+                        </span>
+                      </div>
+
+                      <FieldErrorMsg
+                        message={
+                          errors.imageUrl?.message ||
+                          errors.bannerImage?.message ||
+                          errors.iconImageUrl?.message
+                        }
+                      />
+
+                      <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-4">
+                        <h3 className="mb-2 text-xs font-semibold text-sky-800">
+                          Image guidelines
+                        </h3>
+                        <ul className="space-y-1 text-[11px] text-sky-600">
+                          <li>• Primary image: square (1:1)</li>
+                          <li>• Banner image: wide (3:1) recommended</li>
+                          <li>• Icon image: simple, recognizable (1:1)</li>
+                          <li>• Supported formats: JPG, PNG, SVG, WebP</li>
+                        </ul>
+                      </div>
+                    </Section>
+                  </div>
+                )}
+
+                {/* ---------- DETAILS ---------- */}
+                {activeTab === "details" && (
+                  <div className="space-y-5">
+
+                    <Section>
+                      <SectionHeader
+                        title="FAQs"
+                        desc="Answer common questions to build trust."
+                        icon={<FiHelpCircle className="size-4" />}
+                      />
+                      <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 mb-4">
+                        <div className="grid gap-3">
+                          <div>
+                            <FieldLabel htmlFor="faq-question">
+                              Question
+                            </FieldLabel>
+                            <Input
+                              id="faq-question"
+                              name="question"
+                              value={currentFaq.question}
+                              onChange={handleFaqChange}
+                              placeholder="e.g., What services are included?"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <FieldLabel htmlFor="faq-answer">Answer</FieldLabel>
+                            <Textarea
+                              id="faq-answer"
+                              name="answer"
+                              value={currentFaq.answer}
+                              onChange={handleFaqChange}
+                              placeholder="Write a clear, helpful answer"
+                              rows={2}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={addOrUpdateFaq}
+                            >
+                              {editingFaqIndex !== null
+                                ? "Update FAQ"
+                                : "Add FAQ"}
+                            </Button>
+                            {editingFaqIndex !== null && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={cancelEditFaq}
+                              >
+                                Cancel
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {faqs && faqs.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="mb-2 flex items-center gap-2">
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Published FAQs
+                            </h3>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                              {faqs.length}
+                            </span>
+                          </div>
+                          {faqs.map((faq, index) => (
+                            <div
+                              key={`${faq.question}-${index}`}
+                              className={`flex items-start justify-between gap-4 rounded-lg border bg-white p-3 transition ${editingFaqIndex === index
+                                  ? "border-emerald-300 ring-1 ring-emerald-200"
+                                  : "border-slate-200 hover:border-slate-300"
+                                }`}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-slate-800">
+                                  {faq.question}
+                                </p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                  {faq.answer}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => editFaq(index)}
+                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                >
+                                  <FiEdit2 className="size-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteFaq(index)}
+                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                >
+                                  <FiTrash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {(!faqs || faqs.length === 0) && (
+                        <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 py-6 text-center text-slate-400">
+                          <FiHelpCircle className="size-5" />
+                          <p className="text-xs">
+                            No FAQs yet — add your first one above.
+                          </p>
+                        </div>
+                      )}
+                    </Section>
+
+                    <Section>
+                      <SectionHeader
+                        title="Publishing"
+                        desc="Control when and where this material is visible."
+                        icon={<FiSettings className="size-4" />}
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <FieldLabel htmlFor="status">Status</FieldLabel>
+                          <Controller
+                            name="status"
+                            control={control}
+                            render={({ field }) => (
+                              <select
+                                id="status"
+                                {...field}
+                                className="w-full px-3 py-2 bg-white border border-slate-300 outline-none rounded-lg text-sm text-slate-700 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition mt-1"
+                              >
+                                <option value="DRAFT">
+                                  Draft — hidden from public
+                                </option>
+                                <option value="PUBLISHED">
+                                  Published — visible on site
+                                </option>
+                              </select>
+                            )}
+                          />
+                          <FieldErrorMsg message={errors.status?.message} />
+                        </div>
+
+                      </div>
+                    </Section>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* ============ Footer ============ */}
+            <DialogFooter className="border-t border-slate-200 bg-white px-6 py-3 flex items-center justify-between">
+              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+                <Check className="size-3.5 text-emerald-500" />
+                All changes saved locally — click{" "}
+                {isEditMode ? "Update" : "Create"} to submit.
+              </div>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onCancel}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="min-w-[140px] bg-primary/90 hover:bg-primary"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <LoaderCircle className="animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>{isEditMode ? "Update Material" : "Create Material"}</>
+                  )}
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {showGallery && (
+        <WebsiteGalleryModel
+          onCancel={handleGalleryClose}
+          onSentSelected={handleGallerySelect}
           mode="single"
         />
       )}

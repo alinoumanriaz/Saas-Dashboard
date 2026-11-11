@@ -1,1892 +1,1386 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { ChangeEvent, useEffect, useState, useMemo, ReactNode } from "react";
-import { useMutation, useLazyQuery } from "@apollo/client/react";
-import { useFormContext, Controller, useWatch } from "react-hook-form";
-import { z } from "zod";
-import dynamic from "next/dynamic";
-import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import {
-    FiX,
-    FiInfo,
-    FiSearch,
-    FiFileText,
-    FiImage,
-    FiHelpCircle,
-    FiCheckCircle,
-    FiXCircle,
-    FiAlertCircle,
-    FiSmartphone,
-    FiMonitor,
-    FiTrendingUp,
-    FiHash,
-    FiType,
-    FiLink,
-    FiEdit2,
-    FiTrash2,
-    FiUploadCloud,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogHeader,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Box, LoaderCircle, Search, Check, Info } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { generateSlug } from "@/helpers/slug-maker";
+import { useLazyQuery, useMutation } from "@apollo/client/react";
+import {
+  CHECK_INDUSTRY_H1_TAG_UNIQUE,
+  CHECK_INDUSTRY_META_TITLE_UNIQUE,
+  CHECK_INDUSTRY_SLUG_UNIQUE,
+  CREATE_INDUSTRY,
+  UPDATE_INDUSTRY,
+} from "@/graphql/current-website-queries/industry.query";
+import {
+  FiCheckCircle,
+  FiEdit2,
+  FiFileText,
+  FiHelpCircle,
+  FiImage,
+  FiSettings,
+  FiTrash2,
+  FiUploadCloud,
+  FiX,
+  FiXCircle,
+  FiLayers,
+  FiGrid,
+  FiTag,
 } from "react-icons/fi";
+import z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import TiptopTextEditor from "@/components/TiptopTextEditor";
+import Image from "next/image";
+import WebsiteGalleryModel from "./WebsiteGallery.model";
+import { removeTypename } from "@/helpers/removetypename";
 import { toast } from "sonner";
 
-// shadcn/ui components
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-
-// Custom components
-import WebsiteGalleryModel from "./WebsiteGallery.model";
-import { DynamicFormPopup, TabConfig } from "@/components/TabbedForm";
-
-// Helpers & GraphQL
-import { generateSlug } from "@/helpers/slug-maker";
-import { removeTypename } from "@/helpers/removetypename";
-import {
-    CHECK_INDUSTRY_H1_TAG_UNIQUE,
-    CHECK_INDUSTRY_META_TITLE_UNIQUE,
-    CHECK_INDUSTRY_SLUG_UNIQUE,
-    CREATE_INDUSTRY,
-    UPDATE_INDUSTRY,
-} from "@/graphql/current-website-queries/industry.query";
-
-// Rich Text Editor (dynamic import)
-const TiptopEditor = dynamic(() => import("../../TiptopTextEditor"), {
-    ssr: false,
-});
-
-// ---------- Types ----------
-interface FAQItem {
-    __typename?: string;
-    question: string;
-    answer: string;
-    order: number;
-}
+/* ============================================================
+ * Constants & Types
+ * ============================================================ */
+const META_DESCRIPTION_MAX = 160;
+const ALT_TEXT_MAX = 125;
 
 interface ImageItem {
-    url: string;
-    alt: string;
+  url: string;
+  alt: string;
 }
 
-const META_DESCRIPTION_MAX = 160;
+interface FaqItem {
+  question: string;
+  answer: string;
+}
 
-// Zod schema for the form
-const industrySchema = z.object({
-    name: z.string().min(1, "Industry name is required"),
-    slug: z
-        .string()
-        .min(1, "Slug is required")
-        .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-            message:
-                "Slug can only contain lowercase letters, numbers, and hyphens",
-        }),
-    h1Tag: z.string().min(1, "H1 Tag is required"),
-    metaTitle: z.string().min(1, "Meta Title is required"),
-    metaDescription: z.string().optional(),
-    description: z.string().optional(),
-    content: z.string().optional(),
+type ImageMode = "imageUrl" | "bannerImage" | "iconImageUrl";
+
+interface AddIndustryProps {
+  onCancel: () => void;
+  selectedData?: any;
+  isEditMode: boolean;
+  refetch?: () => void;
+}
+
+/* ============================================================
+ * Image normalisation — handles string | object | nested | array
+ * ============================================================ */
+const toImageItem = (input: any): ImageItem | null => {
+  if (!input) return null;
+  if (typeof input === "string") return { url: input, alt: "" };
+  if (typeof input === "object") {
+    if (input.image && (input.image.url || typeof input.image === "string")) {
+      return toImageItem(input.image);
+    }
+    if (input.url) return { url: input.url, alt: input.alt || "" };
+  }
+  return null;
+};
+
+const toSingleImage = (input: any): ImageItem | null => {
+  if (Array.isArray(input)) return toImageItem(input[0]);
+  return toImageItem(input);
+};
+
+/* ============================================================
+ * Zod Schema
+ * ============================================================ */
+const imageObjectSchema = z.object({
+  url: z.string().min(1, "Image is required"),
+  alt: z.string().max(ALT_TEXT_MAX).default(""),
 });
 
-type FormValues = z.infer<typeof industrySchema>;
+const industryFormSchema = z.object({
+  name: z.string().min(1, "Industry name is required"),
+  slug: z
+    .string()
+    .min(1, "Slug is required")
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+      message: "Lowercase letters, numbers, and hyphens only",
+    }),
+  h1Tag: z.string().min(1, "H1 Tag is required"),
+  metaTitle: z.string().min(1, "Meta Title is required"),
+  metaDescription: z.string().optional(),
+  shortDescription: z.string().optional(),
+  content: z.string().optional(),
+  imageUrl: imageObjectSchema.nullable().optional(), // single
+  bannerImage: imageObjectSchema.nullable().optional(), // single
+  iconImageUrl: imageObjectSchema.nullable().optional(), // single
+  faqs: z.array(z.any()).default([]),
+  status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
+});
 
-// Helper functions for image conversion
-const toSingleImage = (input: any): ImageItem | null => {
-    if (!input) return null;
-    if (typeof input === "string") return { url: input, alt: "" };
-    if (input.url) return { url: input.url, alt: input.alt || "" };
-    return null;
-};
-
-const toImageArray = (input: any): ImageItem[] => {
-    if (!input) return [];
-    if (Array.isArray(input)) return input;
-    if (typeof input === "string") return [{ url: input, alt: "" }];
-    if (input.url) return [{ url: input.url, alt: input.alt || "" }];
-    return [];
-};
+type FormValues = z.infer<typeof industryFormSchema>;
 
 /* ============================================================
- * Shared presentational helpers
+ * Reusable inline UI helpers (mirror of AddProduct)
  * ============================================================ */
-interface SectionCardProps {
-    icon: ReactNode;
-    title: string;
-    description?: string;
-    tone?: "indigo" | "violet" | "sky" | "amber" | "emerald" | "rose" | "slate";
-    children: ReactNode;
-}
+const FieldErrorMsg = ({ message }: { message?: string }) =>
+  message ? (
+    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-rose-600">
+      <FiXCircle className="size-3.5 shrink-0" />
+      {message}
+    </p>
+  ) : null;
 
-const TONE_STYLES: Record<
-    NonNullable<SectionCardProps["tone"]>,
-    { bg: string; text: string }
-> = {
-    indigo: { bg: "bg-indigo-50", text: "text-indigo-600" },
-    violet: { bg: "bg-violet-50", text: "text-violet-600" },
-    sky: { bg: "bg-sky-50", text: "text-sky-600" },
-    amber: { bg: "bg-amber-50", text: "text-amber-600" },
-    emerald: { bg: "bg-emerald-50", text: "text-emerald-600" },
-    rose: { bg: "bg-rose-50", text: "text-rose-600" },
-    slate: { bg: "bg-slate-100", text: "text-slate-600" },
-};
-
-const SectionCard = ({
-    icon,
-    title,
-    description,
-    tone = "indigo",
-    children,
-}: SectionCardProps) => {
-    const toneStyle = TONE_STYLES[tone];
-    return (
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <header className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
-                <span
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${toneStyle.bg} ${toneStyle.text}`}
-                >
-                    {icon}
-                </span>
-                <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-slate-800">
-                        {title}
-                    </h3>
-                    {description && (
-                        <p className="mt-0.5 text-xs text-slate-500">
-                            {description}
-                        </p>
-                    )}
-                </div>
-            </header>
-            <div className="px-5 py-5">{children}</div>
-        </section>
-    );
-};
-
-const FieldLabel = ({
-    htmlFor,
-    required,
-    children,
-}: {
-    htmlFor?: string;
-    required?: boolean;
-    children: ReactNode;
-}) => (
-    <label
-        htmlFor={htmlFor}
-        className="mb-1.5 block text-sm font-medium text-slate-700"
-    >
-        {children}
-        {required && <span className="ml-0.5 text-rose-500">*</span>}
-    </label>
+const Hint = ({ children }: { children: React.ReactNode }) => (
+  <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+    <Info className="size-3" /> {children}
+  </p>
 );
 
-const FieldError = ({ message }: { message?: string }) =>
-    message ? (
-        <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-rose-600">
-            <FiXCircle className="size-3.5 shrink-0" />
-            {message}
-        </p>
-    ) : null;
+const SectionHeader = ({
+  title,
+  desc,
+  icon,
+}: {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+}) => (
+  <div className="flex items-start gap-3 mb-4">
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-primary/90 ring-1 ring-indigo-100">
+      {icon}
+    </div>
+    <div>
+      <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+      <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+    </div>
+  </div>
+);
+
+const Section = ({ children }: { children: React.ReactNode }) => (
+  <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    {children}
+  </div>
+);
 
 const UniquenessResult = ({ status }: { status: string }) =>
-    status ? (
-        <p
-            className={`mt-1.5 flex items-center gap-1.5 text-xs font-medium ${
-                status.startsWith("✓") ? "text-emerald-600" : "text-rose-600"
-            }`}
-        >
-            {status.startsWith("✓") ? (
-                <FiCheckCircle className="size-3.5 shrink-0" />
-            ) : (
-                <FiXCircle className="size-3.5 shrink-0" />
-            )}
-            {status.replace(/^[✓✗]\s*/, "")}
-        </p>
-    ) : null;
+  status ? (
+    <p
+      className={`mt-1.5 flex items-center gap-1.5 text-xs font-medium ${
+        status.startsWith("✓") ? "text-emerald-600" : "text-rose-600"
+      }`}
+    >
+      {status.startsWith("✓") ? (
+        <FiCheckCircle className="size-3.5 shrink-0" />
+      ) : (
+        <FiXCircle className="size-3.5 shrink-0" />
+      )}
+      {status.replace(/^[✓✗]\s*/, "")}
+    </p>
+  ) : null;
 
 /* ============================================================
- * 1. Basic Tab
- * ============================================================ */
-interface BasicTabProps {
-    isEditMode: boolean;
-    slugCheck: string;
-    checkingSlug: boolean;
-    checkSlugUnique: (slug: string) => void;
-    isSlugManual: boolean;
-    setIsSlugManual: (value: boolean) => void;
-}
-
-const BasicTab = ({
-    isEditMode,
-    slugCheck,
-    checkingSlug,
-    checkSlugUnique,
-    isSlugManual,
-    setIsSlugManual,
-}: BasicTabProps) => {
-    const {
-        control,
-        setValue,
-        formState: { errors },
-    } = useFormContext<FormValues>();
-    const name = useWatch({ control, name: "name" });
-    const slug = useWatch({ control, name: "slug" });
-
-    useEffect(() => {
-        if (!isSlugManual && name) {
-            setValue("slug", generateSlug(name), {
-                shouldValidate: true,
-                shouldDirty: true,
-            });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [name, isSlugManual]);
-
-    return (
-        <SectionCard
-            icon={<FiInfo className="size-4.5" />}
-            title="Basic information"
-            description="The essentials visitors and search engines see first."
-            tone="indigo"
-        >
-            <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
-                {/* Name */}
-                <div>
-                    <FieldLabel htmlFor="industry-name" required>
-                        Industry name
-                    </FieldLabel>
-                    <Controller
-                        name="name"
-                        control={control}
-                        render={({ field }) => (
-                            <Input
-                                id="industry-name"
-                                placeholder="e.g., Web Development"
-                                {...field}
-                            />
-                        )}
-                    />
-                    <FieldError message={errors.name?.message} />
-                </div>
-
-                {/* Slug */}
-                <div>
-                    <FieldLabel htmlFor="industry-slug" required>
-                        Slug
-                    </FieldLabel>
-                    <div className="flex gap-2">
-                        <Controller
-                            name="slug"
-                            control={control}
-                            render={({ field }) => (
-                                <Input
-                                    id="industry-slug"
-                                    placeholder="industry-slug"
-                                    {...field}
-                                    onFocus={() => setIsSlugManual(true)}
-                                    onBlur={() => {
-                                        if (
-                                            field.value ===
-                                            generateSlug(name ?? "")
-                                        ) {
-                                            setIsSlugManual(false);
-                                        }
-                                    }}
-                                />
-                            )}
-                        />
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => checkSlugUnique(slug)}
-                            disabled={checkingSlug || !slug?.trim()}
-                            className="shrink-0"
-                        >
-                            {checkingSlug ? "Checking…" : "Check"}
-                        </Button>
-                    </div>
-                    <UniquenessResult status={slugCheck} />
-                    <FieldError message={errors.slug?.message} />
-                </div>
-
-                {/* Description */}
-                <div className="md:col-span-2">
-                    <FieldLabel>Description</FieldLabel>
-                    <Controller
-                        name="description"
-                        control={control}
-                        render={({ field }) => (
-                            <div className="overflow-hidden rounded-lg border border-slate-200">
-                                <TiptopEditor
-                                    height="h-40"
-                                    initialValue={field.value}
-                                    onChange={(content: string) =>
-                                        field.onChange(content)
-                                    }
-                                />
-                            </div>
-                        )}
-                    />
-                    <FieldError message={errors.description?.message} />
-                </div>
-            </div>
-        </SectionCard>
-    );
-};
-
-/* ============================================================
- * 2. Meta Tab
- * ============================================================ */
-interface MetaTabProps {
-    h1TagCheck: string;
-    checkingH1Tag: boolean;
-    metaTitleCheck: string;
-    checkingMetaTitle: boolean;
-    checkH1TagUnique: (h1Tag: string) => void;
-    checkMetaTitleUnique: (metaTitle: string) => void;
-    isH1Manual: boolean;
-    setIsH1Manual: (value: boolean) => void;
-    isMetaTitleManual: boolean;
-    setIsMetaTitleManual: (value: boolean) => void;
-}
-
-const MetaTab = ({
-    h1TagCheck,
-    checkingH1Tag,
-    metaTitleCheck,
-    checkingMetaTitle,
-    checkH1TagUnique,
-    checkMetaTitleUnique,
-    isH1Manual,
-    setIsH1Manual,
-    isMetaTitleManual,
-    setIsMetaTitleManual,
-}: MetaTabProps) => {
-    const {
-        control,
-        formState: { errors },
-    } = useFormContext<FormValues>();
-    const name = useWatch({ control, name: "name" });
-    const h1Tag = useWatch({ control, name: "h1Tag" });
-    const metaTitle = useWatch({ control, name: "metaTitle" });
-    const metaDescription = useWatch({ control, name: "metaDescription" });
-    const descLength = metaDescription?.length ?? 0;
-    const descTone =
-        descLength > META_DESCRIPTION_MAX
-            ? "text-rose-500"
-            : descLength > 150
-              ? "text-amber-500"
-              : "text-emerald-600";
-
-    return (
-        <SectionCard
-            icon={<FiSearch className="size-4.5" />}
-            title="Meta & SEO"
-            description="Controls how this industry appears in search results."
-            tone="sky"
-        >
-            <div className="space-y-5">
-                {/* H1 Tag */}
-                <div>
-                    <FieldLabel htmlFor="industry-h1" required>
-                        H1 tag
-                    </FieldLabel>
-                    <div className="flex gap-2">
-                        <Controller
-                            name="h1Tag"
-                            control={control}
-                            render={({ field }) => (
-                                <Input
-                                    id="industry-h1"
-                                    placeholder="e.g., Professional Web Development Services"
-                                    {...field}
-                                    onFocus={() => setIsH1Manual(true)}
-                                    onBlur={() => {
-                                        if (field.value === (name ?? "")) {
-                                            setIsH1Manual(false);
-                                        }
-                                    }}
-                                />
-                            )}
-                        />
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => checkH1TagUnique(h1Tag)}
-                            disabled={checkingH1Tag || !h1Tag?.trim()}
-                            className="shrink-0"
-                        >
-                            {checkingH1Tag ? "Checking…" : "Check"}
-                        </Button>
-                    </div>
-                    <UniquenessResult status={h1TagCheck} />
-                    <FieldError message={errors.h1Tag?.message} />
-                </div>
-
-                {/* Meta Title */}
-                <div>
-                    <FieldLabel htmlFor="industry-meta-title" required>
-                        Meta title
-                    </FieldLabel>
-                    <div className="flex gap-2">
-                        <Controller
-                            name="metaTitle"
-                            control={control}
-                            render={({ field }) => (
-                                <Input
-                                    id="industry-meta-title"
-                                    placeholder="e.g., Web Development Services | Your Company"
-                                    {...field}
-                                    onFocus={() => setIsMetaTitleManual(true)}
-                                    onBlur={() => {
-                                        if (field.value === (name ?? "")) {
-                                            setIsMetaTitleManual(false);
-                                        }
-                                    }}
-                                />
-                            )}
-                        />
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => checkMetaTitleUnique(metaTitle)}
-                            disabled={checkingMetaTitle || !metaTitle?.trim()}
-                            className="shrink-0"
-                        >
-                            {checkingMetaTitle ? "Checking…" : "Check"}
-                        </Button>
-                    </div>
-                    <UniquenessResult status={metaTitleCheck} />
-                    <FieldError message={errors.metaTitle?.message} />
-                </div>
-
-                {/* Meta Description */}
-                <div>
-                    <div className="mb-1.5 flex items-baseline justify-between">
-                        <FieldLabel htmlFor="industry-meta-desc">
-                            Meta description
-                        </FieldLabel>
-                        <span className={`text-xs font-medium ${descTone}`}>
-                            {descLength}/{META_DESCRIPTION_MAX}
-                        </span>
-                    </div>
-                    <Controller
-                        name="metaDescription"
-                        control={control}
-                        render={({ field }) => (
-                            <Textarea
-                                id="industry-meta-desc"
-                                placeholder="Summarize this industry for search engines, ideally 150–160 characters"
-                                rows={3}
-                                {...field}
-                            />
-                        )}
-                    />
-                    <FieldError
-                        message={errors.metaDescription?.message as string}
-                    />
-                </div>
-            </div>
-        </SectionCard>
-    );
-};
-
-/* ============================================================
- * 3. Content Tab
- * ============================================================ */
-const ContentTab = () => {
-    const { control } = useFormContext<FormValues>();
-    return (
-        <SectionCard
-            icon={<FiFileText className="size-4.5" />}
-            title="Content"
-            description="The detailed content shown on the industry page."
-            tone="violet"
-        >
-            <div>
-                <FieldLabel>Detailed content</FieldLabel>
-                <Controller
-                    name="content"
-                    control={control}
-                    render={({ field }) => (
-                        <div className="overflow-hidden rounded-lg border border-slate-200">
-                            <TiptopEditor
-                                height="h-40"
-                                initialValue={field.value}
-                                onChange={(content: string) =>
-                                    field.onChange(content)
-                                }
-                            />
-                        </div>
-                    )}
-                />
-            </div>
-        </SectionCard>
-    );
-};
-
-/* ============================================================
- * 4. Images Tab
+ * Reusable single-image uploader (with inline alt editing)
  * ============================================================ */
 const ImageUploadCard = ({
-    label,
-    imageUrl,
-    hasAlt,
-    onOpenGallery,
-    onRemove,
+  label,
+  hint,
+  image,
+  aspect = "square",
+  onPick,
+  onRemove,
 }: {
-    label: string;
-    imageUrl: string;
-    hasAlt: boolean;
-    onOpenGallery: () => void;
-    onRemove: () => void;
+  label: string;
+  hint?: string;
+  image: ImageItem | null | undefined;
+  aspect?: "square" | "banner" | "icon";
+  onPick: () => void;
+  onRemove: () => void;
 }) => {
-    return (
-        <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-600">
-                {label}
-            </label>
-            <div className="group relative">
-                <div
-                    onClick={onOpenGallery}
-                    className="relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-slate-300 transition hover:border-indigo-400 hover:bg-indigo-50/50"
-                    role="button"
-                    tabIndex={0}
-                    onKeyUp={(e) => {
-                        if (e.key === "Enter" || e.key === " ")
-                            onOpenGallery();
-                    }}
-                >
-                    {imageUrl ? (
-                        <>
-                            <Image
-                                src={imageUrl}
-                                alt="Industry"
-                                fill
-                                className="rounded-xl object-cover"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
-                                <span className="text-xs font-medium text-white">
-                                    Change
-                                </span>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="p-4 text-center">
-                            <FiUploadCloud className="mx-auto size-6 text-slate-400" />
-                            <p className="mt-1 text-xs text-slate-500">
-                                Click to upload
-                            </p>
-                        </div>
-                    )}
-                </div>
-                {hasAlt && (
-                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/80 px-2 py-0.5 text-[10px] text-white">
-                        Alt text set
-                    </div>
-                )}
-                {imageUrl && (
-                    <button
-                        type="button"
-                        onClick={onRemove}
-                        className="absolute -right-2 -top-2 rounded-full bg-rose-500 p-1 text-white opacity-0 shadow-md transition group-hover:opacity-100 hover:bg-rose-600"
-                        aria-label="Remove image"
-                    >
-                        <FiX className="size-3" />
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-};
+  const container =
+    aspect === "banner"
+      ? "aspect-[3/1] w-full"
+      : aspect === "icon"
+        ? "size-24"
+        : "aspect-square w-full";
 
-interface ImagesTabProps {
-    imageUrl: ImageItem[];
-    bannerImage: ImageItem | null;
-    iconImageUrl: ImageItem | null;
-    getImageUrl: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => string;
-    hasCustomAltText: (
-        mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-    ) => boolean;
-    openGallery: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => void;
-    removeImage: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => void;
-}
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <label className="text-xs font-medium text-slate-600">{label}</label>
+        {hint && <span className="text-[10px] text-slate-400">{hint}</span>}
+      </div>
 
-const ImagesTab = ({
-    imageUrl,
-    bannerImage,
-    iconImageUrl,
-    getImageUrl,
-    hasCustomAltText,
-    openGallery,
-    removeImage,
-}: ImagesTabProps) => {
-    return (
-        <SectionCard
-            icon={<FiImage className="size-4.5" />}
-            title="Images"
-            description="Add and describe the images used across the site."
-            tone="amber"
-        >
-            <div className="space-y-5">
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                    <ImageUploadCard
-                        label="Profile image"
-                        imageUrl={getImageUrl("imageUrl")}
-                        hasAlt={hasCustomAltText("imageUrl")}
-                        onOpenGallery={() => openGallery("imageUrl")}
-                        onRemove={() => removeImage("imageUrl")}
-                    />
-                    <ImageUploadCard
-                        label="Banner image"
-                        imageUrl={getImageUrl("bannerImage")}
-                        hasAlt={hasCustomAltText("bannerImage")}
-                        onOpenGallery={() => openGallery("bannerImage")}
-                        onRemove={() => removeImage("bannerImage")}
-                    />
-                    <ImageUploadCard
-                        label="Icon image"
-                        imageUrl={getImageUrl("iconImageUrl")}
-                        hasAlt={hasCustomAltText("iconImageUrl")}
-                        onOpenGallery={() => openGallery("iconImageUrl")}
-                        onRemove={() => removeImage("iconImageUrl")}
-                    />
-                </div>
-
-                <div className="rounded-xl border border-sky-100 bg-sky-50 p-4">
-                    <h3 className="mb-2 text-xs font-semibold text-sky-800">
-                        Image guidelines
-                    </h3>
-                    <ul className="space-y-1 text-[11px] text-sky-600">
-                        <li>
-                            • Profile image: square (1:1), first image is used
-                        </li>
-                        <li>• Banner image: wide (3:1) recommended</li>
-                        <li>• Icon image: simple, recognizable</li>
-                        <li>• Supported formats: JPG, PNG, SVG, WebP</li>
-                    </ul>
-                </div>
-            </div>
-        </SectionCard>
-    );
-};
-
-/* ============================================================
- * 5. FAQs Tab
- * ============================================================ */
-interface FaqsTabProps {
-    faqs: FAQItem[];
-    currentFaq: FAQItem;
-    editingFaqIndex: number | null;
-    handleFaqChange: (
-        e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-    ) => void;
-    addOrUpdateFaq: () => void;
-    editFaq: (index: number) => void;
-    deleteFaq: (index: number) => void;
-    cancelEditFaq: () => void;
-}
-
-const FaqsTab = ({
-    faqs,
-    currentFaq,
-    editingFaqIndex,
-    handleFaqChange,
-    addOrUpdateFaq,
-    editFaq,
-    deleteFaq,
-    cancelEditFaq,
-}: FaqsTabProps) => {
-    return (
-        <div className="space-y-6">
-            <SectionCard
-                icon={<FiHelpCircle className="size-4.5" />}
-                title={editingFaqIndex !== null ? "Edit FAQ" : "Add a FAQ"}
-                description="Answer the questions visitors ask most before they contact you."
-                tone="emerald"
-            >
-                <div className="space-y-3">
-                    <div>
-                        <FieldLabel htmlFor="faq-question" required>
-                            Question
-                        </FieldLabel>
-                        <Input
-                            id="faq-question"
-                            name="question"
-                            value={currentFaq.question}
-                            onChange={handleFaqChange}
-                            placeholder="e.g., What services are included?"
-                        />
-                    </div>
-                    <div>
-                        <FieldLabel htmlFor="faq-answer" required>
-                            Answer
-                        </FieldLabel>
-                        <Textarea
-                            id="faq-answer"
-                            name="answer"
-                            value={currentFaq.answer}
-                            onChange={handleFaqChange}
-                            placeholder="Write a clear, helpful answer"
-                            rows={3}
-                        />
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                        <Button type="button" onClick={addOrUpdateFaq}>
-                            {editingFaqIndex !== null
-                                ? "Update FAQ"
-                                : "Add FAQ"}
-                        </Button>
-                        {editingFaqIndex !== null && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={cancelEditFaq}
-                            >
-                                Cancel
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </SectionCard>
-
-            <div>
-                <div className="mb-3 flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-slate-700">
-                        Published FAQs
-                    </h3>
-                    {faqs.length > 0 && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                            {faqs.length}
-                        </span>
-                    )}
-                </div>
-                {faqs.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center text-slate-400">
-                        <FiHelpCircle className="size-6" />
-                        <p className="text-sm">
-                            No FAQs yet — add your first one above.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="space-y-2.5">
-                        {faqs.map((faq, index) => (
-                            <div
-                                key={`${faq.question}-${index}`}
-                                className={`flex items-start justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm transition ${
-                                    editingFaqIndex === index
-                                        ? "border-emerald-300 ring-1 ring-emerald-200"
-                                        : "border-slate-200"
-                                }`}
-                            >
-                                <div className="min-w-0">
-                                    <p className="text-sm font-medium text-slate-800">
-                                        {faq.question}
-                                    </p>
-                                    <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                                        {faq.answer}
-                                    </p>
-                                </div>
-                                <div className="flex shrink-0 gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => editFaq(index)}
-                                        className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                                        aria-label="Edit FAQ"
-                                    >
-                                        <FiEdit2 className="size-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => deleteFaq(index)}
-                                        className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-                                        aria-label="Delete FAQ"
-                                    >
-                                        <FiTrash2 className="size-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-/* ============================================================
- * SEO & Insights Sidebar
- * ============================================================ */
-
-/* ---- Animated progress ring ---- */
-const ProgressRing = ({
-    value,
-    size = 84,
-    stroke = 7,
-}: {
-    value: number;
-    size?: number;
-    stroke?: number;
-}) => {
-    const radius = (size - stroke) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (value / 100) * circumference;
-
-    const color =
-        value >= 80 ? "#10b981" : value >= 50 ? "#f59e0b" : "#ef4444";
-
-    return (
-        <div
-            className="relative shrink-0"
-            style={{ width: size, height: size }}
-        >
-            <svg width={size} height={size} className="-rotate-90 transform">
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    stroke="#e2e8f0"
-                    strokeWidth={stroke}
-                    fill="none"
-                />
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    stroke={color}
-                    strokeWidth={stroke}
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={offset}
-                    style={{
-                        transition:
-                            "stroke-dashoffset 500ms cubic-bezier(0.4, 0, 0.2, 1), stroke 300ms",
-                    }}
-                />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span
-                    className="text-lg font-bold leading-none"
-                    style={{ color }}
-                >
-                    {value}
-                </span>
-                <span className="text-[9px] uppercase tracking-wider text-slate-400">
-                    score
-                </span>
-            </div>
-        </div>
-    );
-};
-
-/* ---- Meter bar with optimal zone ---- */
-const Meter = ({
-    value,
-    max,
-    optimalMin,
-    optimalMax,
-}: {
-    value: number;
-    max: number;
-    optimalMin: number;
-    optimalMax: number;
-}) => {
-    const pct = Math.min((value / max) * 100, 100);
-    const inRange = value >= optimalMin && value <= optimalMax;
-    const over = value > optimalMax;
-
-    const color = over
-        ? "bg-rose-500"
-        : inRange
-          ? "bg-emerald-500"
-          : value < optimalMin
-            ? "bg-amber-500"
-            : "bg-rose-500";
-
-    return (
-        <div className="relative mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-            <div
-                className="absolute inset-y-0 bg-emerald-100"
-                style={{
-                    left: `${(optimalMin / max) * 100}%`,
-                    width: `${((optimalMax - optimalMin) / max) * 100}%`,
-                }}
+      <div
+        className={`group relative overflow-hidden rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 transition hover:border-indigo-400 ${container}`}
+      >
+        {image?.url ? (
+          <>
+            <Image
+              src={image.url}
+              alt={image.alt || label}
+              fill
+              className={
+                aspect === "icon"
+                  ? "object-contain p-2"
+                  : "object-cover"
+              }
             />
-            <div
-                className={`absolute inset-y-0 left-0 rounded-full ${color} transition-all duration-300`}
-                style={{ width: `${pct}%` }}
-            />
-        </div>
-    );
-};
-
-/* ---- Checklist item ---- */
-const CheckItem = ({
-    status,
-    label,
-    hint,
-}: {
-    status: "pass" | "warn" | "fail";
-    label: string;
-    hint?: string;
-}) => {
-    const icon =
-        status === "pass" ? (
-            <FiCheckCircle className="size-3.5 text-emerald-500" />
-        ) : status === "warn" ? (
-            <FiAlertCircle className="size-3.5 text-amber-500" />
-        ) : (
-            <FiXCircle className="size-3.5 text-rose-500" />
-        );
-
-    return (
-        <div className="flex items-start gap-2">
-            <div className="mt-0.5 shrink-0">{icon}</div>
-            <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium leading-tight text-slate-700">
-                    {label}
-                </p>
-                {hint && (
-                    <p className="mt-0.5 text-[10px] leading-tight text-slate-400">
-                        {hint}
-                    </p>
-                )}
+            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={onPick}
+                className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-slate-800 shadow hover:bg-white"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={onRemove}
+                className="rounded-full bg-rose-500/90 px-3 py-1 text-[11px] font-medium text-white shadow hover:bg-rose-600"
+              >
+                Remove
+              </button>
             </div>
-        </div>
-    );
-};
-
-/* ---- Section wrapper for sidebar ---- */
-const SidebarSection = ({
-    title,
-    icon,
-    children,
-    badge,
-}: {
-    title: string;
-    icon?: ReactNode;
-    children: ReactNode;
-    badge?: ReactNode;
-}) => (
-    <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-                {icon && <span className="text-slate-400">{icon}</span>}
-                <h4 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                    {title}
-                </h4>
-            </div>
-            {badge}
-        </div>
-        {children}
-    </div>
-);
-
-/* ---- Tiny stat card ---- */
-const StatCard = ({
-    label,
-    value,
-    unit,
-    ok,
-    icon,
-}: {
-    label: string;
-    value: number;
-    unit: string;
-    ok: boolean;
-    icon?: ReactNode;
-}) => (
-    <div
-        className={`rounded-lg border p-2 transition ${
-            ok
-                ? "border-emerald-100 bg-emerald-50/50"
-                : "border-slate-100 bg-slate-50/60"
-        }`}
-    >
-        <div className="flex items-center gap-1 text-[9px] font-medium uppercase tracking-wide text-slate-500">
-            {icon}
-            <span className="truncate">{label}</span>
-        </div>
-        <div className="mt-0.5 flex items-baseline gap-1">
-            <span
-                className={`text-sm font-bold tabular-nums ${
-                    ok ? "text-emerald-700" : "text-slate-700"
-                }`}
-            >
-                {value}
-            </span>
-            <span className="text-[9px] text-slate-400">{unit}</span>
-        </div>
-    </div>
-);
-
-/* ---- Main sidebar ---- */
-const SeoPreviewSidebar = ({
-    hasProfileImage,
-    hasBannerImage,
-    hasIconImage,
-    faqsCount,
-}: {
-    hasProfileImage: boolean;
-    hasBannerImage: boolean;
-    hasIconImage: boolean;
-    faqsCount: number;
-}) => {
-    const { control } = useFormContext<FormValues>();
-    const metaTitle = useWatch({ control, name: "metaTitle" });
-    const metaDescription = useWatch({ control, name: "metaDescription" });
-    const slug = useWatch({ control, name: "slug" });
-    const name = useWatch({ control, name: "name" });
-    const h1Tag = useWatch({ control, name: "h1Tag" });
-    const description = useWatch({ control, name: "description" });
-    const content = useWatch({ control, name: "content" });
-
-    const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">(
-        "desktop"
-    );
-
-    /* ---------- Derived values ---------- */
-    const title =
-        metaTitle?.trim() || name || "Industry title will appear here";
-    const desc =
-        metaDescription?.trim() ||
-        "Meta description preview will appear here. Aim for 150–160 characters.";
-    const url = `yourdomain.com › industries › ${slug || "industry-slug"}`;
-
-    const titleLen = title.length;
-    const descLen = desc.length;
-
-    /* Strip HTML for word count */
-    const stripHtml = (html?: string) =>
-        (html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-
-    const descText = stripHtml(description);
-    const descWords = descText ? descText.split(" ").length : 0;
-    const contentText = stripHtml(content);
-    const contentWords = contentText ? contentText.split(" ").length : 0;
-
-    /* ---------- SEO checks ---------- */
-    const imageCount =
-        (hasProfileImage ? 1 : 0) +
-        (hasBannerImage ? 1 : 0) +
-        (hasIconImage ? 1 : 0);
-
-    const checks = {
-        titleLength: titleLen >= 30 && titleLen <= 60,
-        descLength: descLen >= 120 && descLen <= 160,
-        hasSlug: !!slug?.trim(),
-        slugShort: (slug?.length ?? 0) <= 60,
-        hasH1: !!h1Tag?.trim(),
-        hasImages: imageCount >= 2,
-        hasDescription: descWords >= 30,
-        hasContent: contentWords >= 100,
-        hasFaqs: faqsCount >= 2,
-    };
-
-    const passed = Object.values(checks).filter(Boolean).length;
-    const total = Object.keys(checks).length;
-    const score = Math.round((passed / total) * 100);
-
-    const scoreLabel =
-        score >= 80 ? "Excellent" : score >= 50 ? "Good" : "Needs work";
-    const scoreColor =
-        score >= 80
-            ? "text-emerald-600"
-            : score >= 50
-              ? "text-amber-600"
-              : "text-rose-600";
-
-    /* ---------- Keyword hints ---------- */
-    const keywords = name
-        ? name
-              .toLowerCase()
-              .split(/\s+/)
-              .filter((w) => w.length > 3)
-              .slice(0, 3)
-        : [];
-
-    return (
-        <div className="space-y-3.5">
-            {/* ============ Score header ============ */}
-            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3.5 shadow-sm">
-                <ProgressRing value={score} />
-                <div className="min-w-0 flex-1">
-                    <h4 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                        SEO Score
-                    </h4>
-                    <p className={`mt-0.5 text-sm font-bold ${scoreColor}`}>
-                        {scoreLabel}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-slate-400">
-                        {passed}/{total} checks passed
-                    </p>
-                </div>
-            </div>
-
-            {/* ============ SERP Preview ============ */}
-            <SidebarSection
-                title="Search Preview"
-                icon={<FiLink className="size-3.5" />}
-                badge={
-                    <div className="flex overflow-hidden rounded-md border border-slate-200">
-                        <button
-                            type="button"
-                            onClick={() => setPreviewMode("desktop")}
-                            className={`flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium transition ${
-                                previewMode === "desktop"
-                                    ? "bg-slate-800 text-white"
-                                    : "bg-white text-slate-500 hover:bg-slate-50"
-                            }`}
-                            aria-label="Desktop preview"
-                        >
-                            <FiMonitor className="size-2.5" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setPreviewMode("mobile")}
-                            className={`flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium transition ${
-                                previewMode === "mobile"
-                                    ? "bg-slate-800 text-white"
-                                    : "bg-white text-slate-500 hover:bg-slate-50"
-                            }`}
-                            aria-label="Mobile preview"
-                        >
-                            <FiSmartphone className="size-2.5" />
-                        </button>
-                    </div>
-                }
-            >
-                <div
-                    className={
-                        previewMode === "mobile"
-                            ? "mx-auto max-w-[220px]"
-                            : ""
-                    }
-                >
-                    <div className="flex items-center gap-2">
-                        <div className="size-[22px] rounded-full border border-dashed border-slate-300 bg-slate-100" />
-                        <div className="min-w-0">
-                            <p className="truncate text-[11px] font-medium text-slate-800">
-                                Your Company
-                            </p>
-                            <p className="truncate text-[10px] text-slate-500">
-                                {url}
-                            </p>
-                        </div>
-                    </div>
-                    <p className="mt-1.5 line-clamp-2 cursor-pointer text-[15px] font-normal leading-snug text-[#1a0dab] hover:underline">
-                        {title}
-                    </p>
-                    <p className="mt-0.5 line-clamp-3 text-[11px] leading-snug text-slate-600">
-                        {desc}
-                    </p>
-                </div>
-            </SidebarSection>
-
-            {/* ============ Character Limits ============ */}
-            <SidebarSection
-                title="Character Limits"
-                icon={<FiType className="size-3.5" />}
-            >
-                <div className="space-y-3.5">
-                    <div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-slate-700">
-                                Title
-                            </span>
-                            <span
-                                className={`text-[10px] font-semibold tabular-nums ${
-                                    checks.titleLength
-                                        ? "text-emerald-600"
-                                        : "text-amber-600"
-                                }`}
-                            >
-                                {titleLen}
-                                <span className="text-slate-400">/60</span>
-                            </span>
-                        </div>
-                        <Meter
-                            value={titleLen}
-                            max={70}
-                            optimalMin={30}
-                            optimalMax={60}
-                        />
-                    </div>
-
-                    <div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-slate-700">
-                                Description
-                            </span>
-                            <span
-                                className={`text-[10px] font-semibold tabular-nums ${
-                                    checks.descLength
-                                        ? "text-emerald-600"
-                                        : "text-amber-600"
-                                }`}
-                            >
-                                {descLen}
-                                <span className="text-slate-400">/160</span>
-                            </span>
-                        </div>
-                        <Meter
-                            value={descLen}
-                            max={180}
-                            optimalMin={120}
-                            optimalMax={160}
-                        />
-                    </div>
-
-                    <div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-slate-700">
-                                Slug
-                            </span>
-                            <span className="text-[10px] font-semibold tabular-nums text-slate-500">
-                                {slug?.length ?? 0}
-                                <span className="text-slate-400">/60</span>
-                            </span>
-                        </div>
-                        <Meter
-                            value={slug?.length ?? 0}
-                            max={80}
-                            optimalMin={3}
-                            optimalMax={60}
-                        />
-                    </div>
-                </div>
-            </SidebarSection>
-
-            {/* ============ Content Stats ============ */}
-            <SidebarSection
-                title="Content"
-                icon={<FiFileText className="size-3.5" />}
-            >
-                <div className="grid grid-cols-2 gap-2">
-                    <StatCard
-                        label="Description"
-                        value={descWords}
-                        unit="words"
-                        ok={descWords >= 30}
-                    />
-                    <StatCard
-                        label="Content"
-                        value={contentWords}
-                        unit="words"
-                        ok={contentWords >= 100}
-                    />
-                    <StatCard
-                        label="Images"
-                        value={imageCount}
-                        unit="/ 3"
-                        ok={imageCount >= 2}
-                        icon={<FiImage className="size-3" />}
-                    />
-                    <StatCard
-                        label="FAQs"
-                        value={faqsCount}
-                        unit="items"
-                        ok={faqsCount >= 2}
-                        icon={<FiHash className="size-3" />}
-                    />
-                </div>
-            </SidebarSection>
-
-            {/* ============ Best Practices ============ */}
-            <SidebarSection
-                title="Best Practices"
-                icon={<FiTrendingUp className="size-3.5" />}
-                badge={
-                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
-                        {passed}/{total}
-                    </span>
-                }
-            >
-                <div className="space-y-2.5">
-                    <CheckItem
-                        status={checks.titleLength ? "pass" : "warn"}
-                        label="Meta title length"
-                        hint="Between 30–60 characters"
-                    />
-                    <CheckItem
-                        status={checks.descLength ? "pass" : "warn"}
-                        label="Meta description length"
-                        hint="Between 120–160 characters"
-                    />
-                    <CheckItem
-                        status={
-                            checks.hasH1 && checks.hasSlug ? "pass" : "fail"
-                        }
-                        label="H1 tag & slug"
-                        hint="Required for on-page SEO"
-                    />
-                    <CheckItem
-                        status={checks.slugShort ? "pass" : "warn"}
-                        label="Slug is concise"
-                        hint="Keep under 60 characters"
-                    />
-                    <CheckItem
-                        status={checks.hasDescription ? "pass" : "warn"}
-                        label="Short description"
-                        hint="At least 30 words"
-                    />
-                    <CheckItem
-                        status={checks.hasContent ? "pass" : "warn"}
-                        label="Detailed content"
-                        hint="Aim for 100+ words"
-                    />
-                    <CheckItem
-                        status={checks.hasImages ? "pass" : "warn"}
-                        label="Images added"
-                        hint="At least 2 of 3 image slots"
-                    />
-                    <CheckItem
-                        status={checks.hasFaqs ? "pass" : "warn"}
-                        label="FAQ section"
-                        hint="Rich snippets boost CTR"
-                    />
-                </div>
-            </SidebarSection>
-
-            {/* ============ Keyword Hints ============ */}
-            {keywords.length > 0 && (
-                <SidebarSection
-                    title="Keyword Hints"
-                    icon={<FiHash className="size-3.5" />}
-                >
-                    <p className="mb-2 text-[10px] text-slate-400">
-                        Consider including these in your title & description.
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                        {keywords.map((kw) => {
-                            const inTitle = title
-                                .toLowerCase()
-                                .includes(kw);
-                            const inDesc = desc.toLowerCase().includes(kw);
-                            const both = inTitle && inDesc;
-                            return (
-                                <span
-                                    key={kw}
-                                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                        both
-                                            ? "bg-emerald-100 text-emerald-700"
-                                            : inTitle || inDesc
-                                              ? "bg-amber-100 text-amber-700"
-                                              : "bg-slate-100 text-slate-500"
-                                    }`}
-                                >
-                                    {kw}
-                                </span>
-                            );
-                        })}
-                    </div>
-                </SidebarSection>
+            {!image.alt && (
+              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-medium text-white">
+                Missing alt
+              </span>
             )}
-        </div>
-    );
-};
-
-/* ============================================================
- * Details Tab (merged view) — declared at module scope
- * ============================================================ */
-interface DetailsTabProps {
-    isEditMode: boolean;
-    slugCheck: string;
-    checkingSlug: boolean;
-    checkSlugUnique: (slug: string) => void;
-    h1TagCheck: string;
-    checkingH1Tag: boolean;
-    metaTitleCheck: string;
-    checkingMetaTitle: boolean;
-    checkH1TagUnique: (h1Tag: string) => void;
-    checkMetaTitleUnique: (metaTitle: string) => void;
-    imageUrl: ImageItem[];
-    bannerImage: ImageItem | null;
-    iconImageUrl: ImageItem | null;
-    getImageUrl: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => string;
-    hasCustomAltText: (
-        mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-    ) => boolean;
-    openGallery: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => void;
-    removeImage: (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => void;
-}
-
-const DetailsTab = ({
-    isEditMode,
-    slugCheck,
-    checkingSlug,
-    checkSlugUnique,
-    h1TagCheck,
-    checkingH1Tag,
-    metaTitleCheck,
-    checkingMetaTitle,
-    checkH1TagUnique,
-    checkMetaTitleUnique,
-    imageUrl,
-    bannerImage,
-    iconImageUrl,
-    getImageUrl,
-    hasCustomAltText,
-    openGallery,
-    removeImage,
-}: DetailsTabProps) => {
-    const { control, setValue } = useFormContext<FormValues>();
-    const name = useWatch({ control, name: "name" });
-    const [isSlugManual, setIsSlugManual] = useState(isEditMode);
-    const [isH1Manual, setIsH1Manual] = useState(isEditMode);
-    const [isMetaTitleManual, setIsMetaTitleManual] = useState(isEditMode);
-
-    useEffect(() => {
-        if (!isH1Manual && name !== undefined) {
-            setValue("h1Tag", name, { shouldValidate: true });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [name, isH1Manual]);
-
-    useEffect(() => {
-        if (!isMetaTitleManual && name !== undefined) {
-            setValue("metaTitle", name, { shouldValidate: true });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [name, isMetaTitleManual]);
-
-    return (
-        <div className="space-y-5">
-            <BasicTab
-                isEditMode={isEditMode}
-                slugCheck={slugCheck}
-                checkingSlug={checkingSlug}
-                checkSlugUnique={checkSlugUnique}
-                isSlugManual={isSlugManual}
-                setIsSlugManual={setIsSlugManual}
-            />
-            <MetaTab
-                h1TagCheck={h1TagCheck}
-                checkingH1Tag={checkingH1Tag}
-                metaTitleCheck={metaTitleCheck}
-                checkingMetaTitle={checkingMetaTitle}
-                checkH1TagUnique={checkH1TagUnique}
-                checkMetaTitleUnique={checkMetaTitleUnique}
-                isH1Manual={isH1Manual}
-                setIsH1Manual={setIsH1Manual}
-                isMetaTitleManual={isMetaTitleManual}
-                setIsMetaTitleManual={setIsMetaTitleManual}
-            />
-            <ContentTab />
-            <ImagesTab
-                imageUrl={imageUrl}
-                bannerImage={bannerImage}
-                iconImageUrl={iconImageUrl}
-                getImageUrl={getImageUrl}
-                hasCustomAltText={hasCustomAltText}
-                openGallery={openGallery}
-                removeImage={removeImage}
-            />
-        </div>
-    );
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={onPick}
+            className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-slate-400 transition hover:text-primary/90"
+          >
+            <FiUploadCloud className="size-6" />
+            <span className="text-xs font-medium">Upload</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
 };
 
 /* ============================================================
  * Main Component
  * ============================================================ */
-interface AddIndustryProps {
-    onCancel: () => void;
-    selectedData?: any;
-    isEditMode?: boolean;
-    refetch?: () => void;
-}
-
 const AddIndustry = ({
-    onCancel,
-    selectedData,
-    isEditMode = false,
-    refetch,
+  onCancel,
+  selectedData,
+  isEditMode = false,
+  refetch,
 }: AddIndustryProps) => {
-    // ---------- Local state for images ----------
-    const [imageUrl, setImageUrl] = useState<ImageItem[]>(
-        toImageArray(selectedData?.imageUrl)
-    );
-    const [bannerImage, setBannerImage] = useState<ImageItem | null>(
-        toSingleImage(selectedData?.bannerImage)
-    );
-    const [iconImageUrl, setIconImageUrl] = useState<ImageItem | null>(
-        toSingleImage(selectedData?.iconImageUrl || selectedData?.iconName)
-    );
+  /* ---------- Unique-check state ---------- */
+  const [isSlugManual, setIsSlugManual] = useState(isEditMode);
+  const [isH1Manual, setIsH1Manual] = useState(isEditMode);
+  const [isMetaTitleManual, setIsMetaTitleManual] = useState(isEditMode);
+  const [slugCheck, setSlugCheck] = useState("");
+  const [h1TagCheck, setH1TagCheck] = useState("");
+  const [metaTitleCheck, setMetaTitleCheck] = useState("");
 
-    // ---------- Local state for FAQs ----------
-    const [faqs, setFaqs] = useState<FAQItem[]>(selectedData?.faqs || []);
-    const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
-    const [currentFaq, setCurrentFaq] = useState<FAQItem>({
-        question: "",
-        answer: "",
-        order: 0,
+  /* ---------- Gallery & alt edit ---------- */
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryMode, setGalleryMode] = useState<ImageMode>("imageUrl");
+  // sentinel: "imageUrl" | "bannerImage" | "iconImageUrl" | null
+  const [editingAltOf, setEditingAltOf] = useState<ImageMode | null>(null);
+  const [altInput, setAltInput] = useState("");
+
+  /* ---------- FAQs ---------- */
+  const [currentFaq, setCurrentFaq] = useState<FaqItem>({
+    question: "",
+    answer: "",
+  });
+  const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
+
+
+  /* ---------- Form ---------- */
+  const {
+    control,
+    watch,
+    setValue,
+    reset,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(industryFormSchema),
+    defaultValues: {
+      name: selectedData?.name || "",
+      slug: selectedData?.slug || "",
+      h1Tag: selectedData?.h1Tag || "",
+      metaTitle: selectedData?.metaTitle || "",
+      metaDescription: selectedData?.metaDescription || "",
+      shortDescription: selectedData?.shortDescription || "",
+      content: selectedData?.content || "",
+      imageUrl: toSingleImage(selectedData?.imageUrl),
+      bannerImage: toSingleImage(selectedData?.bannerImage),
+      iconImageUrl: toSingleImage(
+        selectedData?.iconImageUrl || selectedData?.iconName
+      ),
+      faqs: selectedData?.faqs || [],
+      status: selectedData?.status || "DRAFT",
+    },
+  });
+
+  // Rehydrate when selectedData arrives late (async parent fetch)
+  useEffect(() => {
+    if (!selectedData) return;
+    reset({
+      name: selectedData.name || "",
+      slug: selectedData.slug || "",
+      h1Tag: selectedData.h1Tag || "",
+      metaTitle: selectedData.metaTitle || "",
+      metaDescription: selectedData.metaDescription || "",
+      shortDescription: selectedData.shortDescription || "",
+      content: selectedData.content || "",
+      imageUrl: toSingleImage(selectedData.imageUrl),
+      bannerImage: toSingleImage(selectedData.bannerImage),
+      iconImageUrl: toSingleImage(
+        selectedData.iconImageUrl || selectedData.iconName
+      ),
+      faqs: selectedData.faqs || [],
+      status: selectedData.status || "DRAFT",
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedData?.id]);
 
-    // ---------- Gallery modal state ----------
-    const [showGalleryOpen, setShowGalleryOpen] = useState(false);
-    const [galleryMode, setGalleryMode] = useState<
-        "imageUrl" | "bannerImage" | "iconImageUrl"
-    >("imageUrl");
+  const name = watch("name");
+  const slug = watch("slug");
+  const h1Tag = watch("h1Tag");
+  const metaTitle = watch("metaTitle");
+  const metaDescription = watch("metaDescription");
+  const descLength = metaDescription?.length ?? 0;
+  const descTone =
+    descLength > META_DESCRIPTION_MAX
+      ? "text-rose-500"
+      : descLength > 150
+        ? "text-amber-500"
+        : "text-emerald-600";
 
-    // ---------- Unique check states ----------
-    const [slugCheck, setSlugCheck] = useState("");
-    const [h1TagCheck, setH1TagCheck] = useState("");
-    const [metaTitleCheck, setMetaTitleCheck] = useState("");
+  const imageUrl = watch("imageUrl");
+  const bannerImage = watch("bannerImage");
+  const iconImageUrl = watch("iconImageUrl");
+  const faqs = watch("faqs") ?? [];
 
-    // ---------- GraphQL queries for uniqueness ----------
-    const [
-        checkSlug,
-        { loading: checkingSlug, data: slugData, error: slugError },
-    ] = useLazyQuery<any>(CHECK_INDUSTRY_SLUG_UNIQUE);
-    const [
-        checkH1Tag,
-        { loading: checkingH1Tag, data: h1TagData, error: h1TagError },
-    ] = useLazyQuery<any>(CHECK_INDUSTRY_H1_TAG_UNIQUE);
-    const [
-        checkMetaTitle,
-        {
-            loading: checkingMetaTitle,
-            data: metaTitleData,
-            error: metaTitleError,
-        },
-    ] = useLazyQuery<any>(CHECK_INDUSTRY_META_TITLE_UNIQUE);
+  /* ---------- Queries ---------- */
+  const [
+    checkSlug,
+    { loading: checkingSlug, data: slugData, error: slugError },
+  ] = useLazyQuery<any>(CHECK_INDUSTRY_SLUG_UNIQUE, {
+    fetchPolicy: "network-only",
+  });
+  const [
+    checkH1Tag,
+    { loading: checkingH1Tag, data: h1TagData, error: h1TagError },
+  ] = useLazyQuery<any>(CHECK_INDUSTRY_H1_TAG_UNIQUE, {
+    fetchPolicy: "network-only",
+  });
+  const [
+    checkMetaTitle,
+    { loading: checkingMetaTitle, data: metaTitleData, error: metaTitleError },
+  ] = useLazyQuery<any>(CHECK_INDUSTRY_META_TITLE_UNIQUE, {
+    fetchPolicy: "network-only",
+  });
 
-    // Update check feedback when data arrives
-    useEffect(() => {
-        if (slugData?.checkIndustrySlugUnique) {
-            const isUnique = slugData.checkIndustrySlugUnique.isUnique;
-            setSlugCheck(
-                isUnique ? "✓ Slug is available" : "✗ Slug is already taken"
-            );
+  useEffect(() => {
+    if (slugData?.checkIndustrySlugUnique) {
+      setSlugCheck(
+        slugData.checkIndustrySlugUnique.isUnique
+          ? "✓ Slug is available"
+          : "✗ Slug is already taken"
+      );
+    }
+    if (slugError) toast.error("Failed to check slug availability");
+  }, [slugData, slugError]);
+
+  useEffect(() => {
+    if (h1TagData?.checkIndustryH1TagUnique) {
+      setH1TagCheck(
+        h1TagData.checkIndustryH1TagUnique.isUnique
+          ? "✓ H1 Tag is available"
+          : "✗ H1 Tag is already taken"
+      );
+    }
+    if (h1TagError) toast.error("Failed to check H1 Tag");
+  }, [h1TagData, h1TagError]);
+
+  useEffect(() => {
+    if (metaTitleData?.checkIndustryMetaTitleUnique) {
+      setMetaTitleCheck(
+        metaTitleData.checkIndustryMetaTitleUnique.isUnique
+          ? "✓ Meta Title is available"
+          : "✗ Meta Title is already taken"
+      );
+    }
+    if (metaTitleError) toast.error("Failed to check Meta Title");
+  }, [metaTitleData, metaTitleError]);
+
+  /* ---------- Mutations ---------- */
+  const [createIndustry, { loading: createLoading }] =
+    useMutation<any>(CREATE_INDUSTRY);
+  const [updateIndustry, { loading: updateLoading }] =
+    useMutation<any>(UPDATE_INDUSTRY);
+  const isSubmitting = createLoading || updateLoading;
+
+  /* ---------- Unique check handlers ---------- */
+  const checkSlugUnique = (s: string) => {
+    if (!s?.trim()) {
+      toast.error("Please enter a slug");
+      return;
+    }
+    setSlugCheck("");
+    checkSlug({
+      variables: {
+        slug: s,
+        excludeId: isEditMode ? selectedData?.id : undefined,
+      },
+    });
+  };
+  const checkH1TagUnique = (h: string) => {
+    if (!h?.trim()) {
+      toast.error("Please enter an H1 tag");
+      return;
+    }
+    setH1TagCheck("");
+    checkH1Tag({
+      variables: {
+        h1Tag: h,
+        excludeId: isEditMode ? selectedData?.id : undefined,
+      },
+    });
+  };
+  const checkMetaTitleUnique = (m: string) => {
+    if (!m?.trim()) {
+      toast.error("Please enter a meta title");
+      return;
+    }
+    setMetaTitleCheck("");
+    checkMetaTitle({
+      variables: {
+        metaTitle: m,
+        excludeId: isEditMode ? selectedData?.id : undefined,
+      },
+    });
+  };
+
+  /* ---------- Submit ---------- */
+  const onSubmit = async (values: FormValues) => {
+    const clean = removeTypename(values);
+
+    // Ensure all image fields are pure { url, alt } objects
+    const payload = {
+      ...clean,
+      imageUrl: clean.imageUrl
+        ? { url: clean.imageUrl.url, alt: clean.imageUrl.alt || "" }
+        : null,
+      bannerImage: clean.bannerImage
+        ? { url: clean.bannerImage.url, alt: clean.bannerImage.alt || "" }
+        : null,
+      iconImageUrl: clean.iconImageUrl
+        ? { url: clean.iconImageUrl.url, alt: clean.iconImageUrl.alt || "" }
+        : null,
+    };
+
+    try {
+      if (isEditMode && selectedData?.id) {
+        const result = await updateIndustry({
+          variables: { id: selectedData.id, input: payload },
+        });
+        if (result.data?.updateIndustry?.success) {
+          toast.success(
+            result.data.updateIndustry.message || "Industry updated"
+          );
+          refetch?.();
+          onCancel();
+        } else {
+          toast.error(result.data?.updateIndustry?.message || "Update failed");
         }
-        if (slugError) toast.error("Failed to check slug availability");
-    }, [slugData, slugError]);
-
-    useEffect(() => {
-        if (h1TagData?.checkIndustryH1TagUnique) {
-            const isUnique = h1TagData.checkIndustryH1TagUnique.isUnique;
-            setH1TagCheck(
-                isUnique ? "✓ H1 Tag is available" : "✗ H1 Tag is already taken"
-            );
+      } else {
+        const result = await createIndustry({ variables: { input: payload } });
+        if (result.data?.createIndustry?.success) {
+          toast.success(
+            result.data.createIndustry.message || "Industry created"
+          );
+          refetch?.();
+          onCancel();
+        } else {
+          toast.error(result.data?.createIndustry?.message || "Creation failed");
         }
-        if (h1TagError) toast.error("Failed to check H1 Tag availability");
-    }, [h1TagData, h1TagError]);
+      }
+    } catch (error: any) {
+      toast.error(error?.message || "Operation failed. Please try again.");
+    }
+  };
 
-    useEffect(() => {
-        if (metaTitleData?.checkIndustryMetaTitleUnique) {
-            const isUnique = metaTitleData.checkIndustryMetaTitleUnique.isUnique;
-            setMetaTitleCheck(
-                isUnique
-                    ? "✓ Meta Title is available"
-                    : "✗ Meta Title is already taken"
-            );
-        }
-        if (metaTitleError)
-            toast.error("Failed to check Meta Title availability");
-    }, [metaTitleData, metaTitleError]);
+  /* ---------- Image handlers ---------- */
+  const openGallery = (mode: ImageMode) => {
+    setGalleryMode(mode);
+    setShowGallery(true);
+  };
+  const handleGalleryClose = () => setShowGallery(false);
 
-    // ---------- Mutations ----------
-    const [createIndustry, { loading: createLoading }] =
-        useMutation<any>(CREATE_INDUSTRY);
-    const [updateIndustry, { loading: updateLoading }] =
-        useMutation<any>(UPDATE_INDUSTRY);
-    const isSubmitting = createLoading || updateLoading;
+  const handleGallerySelect = (selected: any[]) => {
+    setShowGallery(false);
+    if (!selected?.length) return;
+    const item = toImageItem(selected[0]);
+    if (!item?.url) {
+      toast.error("Selected image has no URL");
+      return;
+    }
+    setValue(galleryMode, item, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
 
-    // ---------- Default values for the form ----------
-    const defaultValues = useMemo<FormValues>(
-        () => ({
-            name: selectedData?.name || "",
-            slug: selectedData?.slug || "",
-            h1Tag: selectedData?.h1Tag || "",
-            metaTitle: selectedData?.metaTitle || "",
-            metaDescription: selectedData?.metaDescription || "",
-            description: selectedData?.description || "",
-            content: selectedData?.content || "",
-        }),
-        [selectedData]
+  const removeImage = (mode: ImageMode) =>
+    setValue(mode, null, { shouldValidate: true, shouldDirty: true });
+
+  const startEditAlt = (mode: ImageMode) => {
+    setEditingAltOf(mode);
+    const current =
+      mode === "imageUrl"
+        ? imageUrl
+        : mode === "bannerImage"
+          ? bannerImage
+          : iconImageUrl;
+    setAltInput(current?.alt ?? "");
+  };
+  const cancelEditAlt = () => {
+    setEditingAltOf(null);
+    setAltInput("");
+  };
+  const saveAlt = () => {
+    if (!editingAltOf) return;
+    const current =
+      editingAltOf === "imageUrl"
+        ? imageUrl
+        : editingAltOf === "bannerImage"
+          ? bannerImage
+          : iconImageUrl;
+    if (!current) {
+      cancelEditAlt();
+      return;
+    }
+    setValue(
+      editingAltOf,
+      { ...current, alt: altInput.trim() },
+      { shouldValidate: true, shouldDirty: true }
     );
+    cancelEditAlt();
+  };
 
-    // ---------- Handlers for unique checks ----------
-    const checkSlugUnique = (slug: string) => {
-        if (!slug?.trim()) {
-            toast.error("Please enter a slug first");
-            return;
-        }
-        setSlugCheck("");
-        checkSlug({
-            variables: {
-                slug,
-                excludeId: isEditMode ? selectedData?.id : undefined,
-            },
-        });
-    };
+  /* ---------- Validation summary ---------- */
+  const validation = {
+    hasPrimary: !!imageUrl?.url,
+    hasAlt:
+      !!imageUrl?.alt?.trim() ||
+      !!bannerImage?.alt?.trim() ||
+      !!iconImageUrl?.alt?.trim(),
+    slotsFilled: [imageUrl, bannerImage, iconImageUrl].filter((i) => !!i?.url)
+      .length,
+  };
+  const checks = [
+    { label: "Primary image set", ok: validation.hasPrimary },
+    {
+      label: "Alt text added",
+      ok: validation.hasAlt,
+    },
+    {
+      label: "Optional slots filled",
+      ok: validation.slotsFilled >= 2,
+    },
+  ];
 
-    const checkH1TagUnique = (h1Tag: string) => {
-        if (!h1Tag?.trim()) {
-            toast.error("Please enter an H1 tag first");
-            return;
-        }
-        setH1TagCheck("");
-        checkH1Tag({
-            variables: {
-                h1Tag,
-                excludeId: isEditMode ? selectedData?.id : undefined,
-            },
-        });
-    };
+  /* ---------- FAQ handlers ---------- */
+  const handleFaqChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setCurrentFaq((prev) => ({ ...prev, [name]: value }));
+  };
+  const addOrUpdateFaq = () => {
+    const q = currentFaq.question.trim();
+    const a = currentFaq.answer.trim();
+    if (!q) {
+      toast.error("FAQ question is required");
+      return;
+    }
+    if (!a) {
+      toast.error("FAQ answer is required");
+      return;
+    }
+    const cur = faqs ?? [];
+    if (editingFaqIndex !== null) {
+      setValue(
+        "faqs",
+        cur.map((f, i) =>
+          i === editingFaqIndex ? { question: q, answer: a } : f
+        ),
+        { shouldValidate: true, shouldDirty: true }
+      );
+      toast.success("FAQ updated");
+    } else {
+      setValue("faqs", [...cur, { question: q, answer: a }], {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      toast.success("FAQ added");
+    }
+    setCurrentFaq({ question: "", answer: "" });
+    setEditingFaqIndex(null);
+  };
+  const editFaq = (i: number) => {
+    const f = faqs?.[i];
+    if (!f) return;
+    setCurrentFaq({ question: f.question, answer: f.answer });
+    setEditingFaqIndex(i);
+  };
+  const deleteFaq = (i: number) => {
+    setValue(
+      "faqs",
+      (faqs ?? []).filter((_, idx) => idx !== i),
+      { shouldValidate: true, shouldDirty: true }
+    );
+    if (editingFaqIndex === i) {
+      setEditingFaqIndex(null);
+      setCurrentFaq({ question: "", answer: "" });
+    }
+  };
+  const cancelEditFaq = () => {
+    setEditingFaqIndex(null);
+    setCurrentFaq({ question: "", answer: "" });
+  };
 
-    const checkMetaTitleUnique = (metaTitle: string) => {
-        if (!metaTitle?.trim()) {
-            toast.error("Please enter a meta title first");
-            return;
-        }
-        setMetaTitleCheck("");
-        checkMetaTitle({
-            variables: {
-                metaTitle,
-                excludeId: isEditMode ? selectedData?.id : undefined,
-            },
-        });
-    };
+  /* ============================================================
+   * Tab layout
+   * ============================================================ */
+  const [activeTab, setActiveTab] = useState<
+    "basic" | "content" | "media" | "details"
+  >("basic");
 
-    // ---------- FAQ handlers ----------
-    const handleFaqChange = (
-        e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-    ) => {
-        const { name, value } = e.target;
-        setCurrentFaq((prev) => ({ ...prev, [name]: value }));
-    };
+  const tabs: {
+    id: typeof activeTab;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    { id: "basic", label: "Basics", icon: <Box className="size-4" /> },
+    {
+      id: "content",
+      label: "Content & SEO",
+      icon: <FiFileText className="size-4" />,
+    },
+    { id: "media", label: "Media", icon: <FiImage className="size-4" /> },
+    {
+      id: "details",
+      label: "Details & Settings",
+      icon: <FiLayers className="size-4" />,
+    },
+  ];
 
-    const addOrUpdateFaq = () => {
-        if (!currentFaq.question.trim() || !currentFaq.answer.trim()) {
-            toast.error("Both question and answer are required");
-            return;
-        }
-        if (editingFaqIndex !== null) {
-            const updatedFaqs = [...faqs];
-            updatedFaqs[editingFaqIndex] = {
-                ...currentFaq,
-                order: editingFaqIndex,
-            };
-            setFaqs(updatedFaqs);
-            setEditingFaqIndex(null);
-        } else {
-            setFaqs([...faqs, { ...currentFaq, order: faqs.length }]);
-        }
-        setCurrentFaq({ question: "", answer: "", order: faqs.length });
-    };
-
-    const editFaq = (index: number) => {
-        setCurrentFaq(faqs[index]);
-        setEditingFaqIndex(index);
-    };
-
-    const deleteFaq = (index: number) => {
-        const updatedFaqs = faqs.filter((_, i) => i !== index);
-        const reorderedFaqs = updatedFaqs.map((faq, i) => ({
-            ...faq,
-            order: i,
-        }));
-        setFaqs(reorderedFaqs);
-        if (editingFaqIndex === index) {
-            setEditingFaqIndex(null);
-            setCurrentFaq({
-                question: "",
-                answer: "",
-                order: reorderedFaqs.length,
-            });
-        } else if (editingFaqIndex !== null && editingFaqIndex > index) {
-            setEditingFaqIndex(editingFaqIndex - 1);
-        }
-    };
-
-    const cancelEditFaq = () => {
-        setEditingFaqIndex(null);
-        setCurrentFaq({ question: "", answer: "", order: faqs.length });
-    };
-
-    // ---------- Gallery handlers ----------
-    const galleryCloseHandler = () => setShowGalleryOpen(false);
-
-    const handleSelectedImage = (images: any[]) => {
-        if (images.length === 0) {
-            if (galleryMode === "imageUrl") setImageUrl([]);
-            else if (galleryMode === "bannerImage") setBannerImage(null);
-            else setIconImageUrl(null);
-        } else {
-            const selected = images[0];
-            const newImage = { url: selected.url, alt: selected.alt || "" };
-            if (galleryMode === "imageUrl") setImageUrl([newImage]);
-            else if (galleryMode === "bannerImage") setBannerImage(newImage);
-            else setIconImageUrl(newImage);
-        }
-        setShowGalleryOpen(false);
-    };
-
-    const openGallery = (
-        mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-    ) => {
-        setGalleryMode(mode);
-        setShowGalleryOpen(true);
-    };
-
-    const removeImage = (mode: "imageUrl" | "bannerImage" | "iconImageUrl") => {
-        if (mode === "imageUrl") setImageUrl([]);
-        else if (mode === "bannerImage") setBannerImage(null);
-        else setIconImageUrl(null);
-    };
-
-    const getImageUrl = (
-        mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-    ): string => {
-        if (mode === "imageUrl")
-            return imageUrl.length > 0 ? imageUrl[0].url : "";
-        const img = mode === "bannerImage" ? bannerImage : iconImageUrl;
-        return img?.url || "";
-    };
-
-    const hasCustomAltText = (
-        mode: "imageUrl" | "bannerImage" | "iconImageUrl"
-    ): boolean => {
-        if (mode === "imageUrl")
-            return imageUrl.length > 0 && !!imageUrl[0].alt;
-        const img = mode === "bannerImage" ? bannerImage : iconImageUrl;
-        return !!img?.alt;
-    };
-
-    // ---------- Form submission ----------
-    const onSubmit = async (values: FormValues) => {
-        const inputData = {
-            ...values,
-            imageUrl: imageUrl.length > 0 ? imageUrl : null,
-            bannerImage,
-            iconImageUrl,
-            faqs,
-        };
-        const cleanInputData = removeTypename(inputData);
-
-        try {
-            let result;
-            if (isEditMode && selectedData?.id) {
-                result = await updateIndustry({
-                    variables: { id: selectedData.id, input: cleanInputData },
-                });
-                if (result.data?.updateIndustry?.success) {
-                    toast.success(
-                        result.data.updateIndustry.message ||
-                            "Industry updated successfully"
-                    );
-                } else {
-                    toast.error(
-                        result.data?.updateIndustry?.message ||
-                            "Failed to update industry"
-                    );
-                }
-            } else {
-                result = await createIndustry({
-                    variables: { input: cleanInputData },
-                });
-                if (result.data?.createIndustry?.success) {
-                    toast.success(
-                        result.data.createIndustry.message ||
-                            "Industry created successfully"
-                    );
-                } else {
-                    toast.error(
-                        result.data?.createIndustry?.message ||
-                            "Failed to create industry"
-                    );
-                }
-            }
-            if (refetch) refetch();
-            onCancel();
-        } catch (error: any) {
-            console.error("GraphQL Error:", error);
-            toast.error(error.message || "Operation failed");
-        }
-    };
-
-    // ---------- Tabs ----------
-    const tabs: TabConfig[] = [
-        {
-            id: "details",
-            label: "Details",
-            content: (
-                <DetailsTab
-                    isEditMode={isEditMode}
-                    slugCheck={slugCheck}
-                    checkingSlug={checkingSlug}
-                    checkSlugUnique={checkSlugUnique}
-                    h1TagCheck={h1TagCheck}
-                    checkingH1Tag={checkingH1Tag}
-                    metaTitleCheck={metaTitleCheck}
-                    checkingMetaTitle={checkingMetaTitle}
-                    checkH1TagUnique={checkH1TagUnique}
-                    checkMetaTitleUnique={checkMetaTitleUnique}
-                    imageUrl={imageUrl}
-                    bannerImage={bannerImage}
-                    iconImageUrl={iconImageUrl}
-                    getImageUrl={getImageUrl}
-                    hasCustomAltText={hasCustomAltText}
-                    openGallery={openGallery}
-                    removeImage={removeImage}
-                />
-            ),
-        },
-        {
-            id: "faqs",
-            label: "FAQs",
-            badge: faqs.length > 0 ? faqs.length : undefined,
-            content: (
-                <FaqsTab
-                    faqs={faqs}
-                    currentFaq={currentFaq}
-                    editingFaqIndex={editingFaqIndex}
-                    handleFaqChange={handleFaqChange}
-                    addOrUpdateFaq={addOrUpdateFaq}
-                    editFaq={editFaq}
-                    deleteFaq={deleteFaq}
-                    cancelEditFaq={cancelEditFaq}
-                />
-            ),
-        },
-    ];
-
-    // ---------- Render ----------
+  /* ============================================================
+   * Render helpers for the media tab
+   * ============================================================ */
+  const renderAltEditor = (mode: ImageMode) => {
+    const current =
+      mode === "imageUrl"
+        ? imageUrl
+        : mode === "bannerImage"
+          ? bannerImage
+          : iconImageUrl;
+    if (editingAltOf !== mode || !current) return null;
     return (
-        <>
-            <DynamicFormPopup<FormValues>
-                open={true}
-                onOpenChange={onCancel}
-                title={isEditMode ? "Edit Industry" : "Add New Industry"}
-                subtitle={
-                    isEditMode
-                        ? "Update the details below and save your changes"
-                        : "Add a new industry to your website catalog"
-                }
-                tabs={tabs}
-                defaultValues={defaultValues}
-                validationSchema={industrySchema}
-                onSubmit={onSubmit}
-                isSubmitting={isSubmitting}
-                submitLabel={isEditMode ? "Update Industry" : "Create Industry"}
-                size="2xl"
-                sidebar={
-                    <SeoPreviewSidebar
-                        hasProfileImage={imageUrl.length > 0}
-                        hasBannerImage={!!bannerImage}
-                        hasIconImage={!!iconImageUrl}
-                        faqsCount={faqs.length}
-                    />
-                }
-            />
-
-            {showGalleryOpen && (
-                <WebsiteGalleryModel
-                    onCancel={galleryCloseHandler}
-                    onSentSelected={handleSelectedImage}
-                    mode="single"
-                />
-            )}
-        </>
+      <div className="absolute inset-0 flex flex-col bg-slate-900/90 p-2">
+        <Textarea
+          value={altInput}
+          onChange={(e) => setAltInput(e.target.value)}
+          placeholder="Describe this image"
+          className="flex-1 resize-none rounded border border-slate-500 bg-transparent p-1.5 text-xs text-white placeholder:text-slate-400"
+          maxLength={ALT_TEXT_MAX}
+          autoFocus
+        />
+        <div className="mt-1 flex items-center justify-between">
+          <span className="text-[10px] text-slate-300">
+            {altInput.length}/{ALT_TEXT_MAX}
+          </span>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={saveAlt}
+              className="rounded bg-emerald-500 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-600"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={cancelEditAlt}
+              className="rounded bg-slate-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-slate-500"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
     );
+  };
+
+  const renderImageCard = (mode: ImageMode, label: string) => {
+    const img =
+      mode === "imageUrl"
+        ? imageUrl
+        : mode === "bannerImage"
+          ? bannerImage
+          : iconImageUrl;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs font-medium text-slate-600">{label}</span>
+          {img?.url && (
+            <button
+              type="button"
+              onClick={() => startEditAlt(mode)}
+              className="text-[10px] font-medium text-primary/90 hover:underline"
+            >
+              {img.alt ? "Edit alt" : "Add alt"}
+            </button>
+          )}
+        </div>
+
+        <div className="group relative aspect-square w-full overflow-hidden rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 transition hover:border-indigo-400">
+          {img?.url ? (
+            <>
+              <Image
+                src={img.url}
+                alt={img.alt || label}
+                fill
+                className="object-cover"
+              />
+              {editingAltOf === mode ? (
+                renderAltEditor(mode)
+              ) : (
+                <>
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => openGallery(mode)}
+                      className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-slate-800 shadow hover:bg-white"
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeImage(mode)}
+                      className="rounded-full bg-rose-500/90 px-3 py-1 text-[11px] font-medium text-white shadow hover:bg-rose-600"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {img.alt ? (
+                    <button
+                      type="button"
+                      onClick={() => startEditAlt(mode)}
+                      className="absolute inset-x-0 bottom-0 truncate bg-black/60 p-1.5 text-left text-[11px] text-white hover:bg-black/75"
+                      title="Edit alt text"
+                    >
+                      {img.alt}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEditAlt(mode)}
+                      className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-medium text-white shadow-md hover:bg-amber-600"
+                    >
+                      <FiEdit2 className="size-3" /> Add alt text
+                    </button>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openGallery(mode)}
+              className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-slate-400 transition hover:text-primary/90"
+            >
+              <FiUploadCloud className="size-7" />
+              <span className="text-xs font-medium">Add image</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  /* ============================================================
+   * Render
+   * ============================================================ */
+  return (
+    <>
+      <Dialog open={true} onOpenChange={() => onCancel()}>
+        <DialogContent className="max-w-6xl! p-0 overflow-hidden bg-slate-50">
+          {/* ============ Header ============ */}
+          <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-white">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-md shadow-indigo-500/30">
+                  <FiGrid size={20} strokeWidth={1.8} />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-bold text-slate-900">
+                    {isEditMode ? "Edit Industry" : "Add New Industry"}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    {isEditMode
+                      ? "Update industry details and metadata."
+                      : "Fill in the sections below. Required fields marked with *"}
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex items-center gap-1 mt-4 -mb-4 overflow-x-auto">
+              {tabs.map((t) => {
+                const active = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveTab(t.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
+                      active
+                        ? "border-indigo-500 text-primary/90"
+                        : "border-transparent text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    {t.icon} {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </DialogHeader>
+
+          {/* ============ Body ============ */}
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col">
+            <ScrollArea className="h-[calc(90vh-220px)]">
+              <div className="px-6 py-5 space-y-5">
+                {/* ---------- BASIC ---------- */}
+                {activeTab === "basic" && (
+                  <div className="space-y-5">
+                    <Section>
+                      <SectionHeader
+                        title="Industry Identity"
+                        desc="The name, URL slug, and short summary for this industry."
+                        icon={<Box className="size-4" />}
+                      />
+                      <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
+                        <div>
+                          <FieldLabel htmlFor="industry-name">
+                            Industry name{" "}
+                            <span className="text-rose-500">*</span>
+                          </FieldLabel>
+                          <Controller
+                            name="name"
+                            control={control}
+                            render={({ field }) => (
+                              <Input
+                                id="industry-name"
+                                placeholder="e.g., Web Development"
+                                {...field}
+                                className="mt-1"
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  if (!isSlugManual)
+                                    setValue(
+                                      "slug",
+                                      generateSlug(e.target.value),
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                }}
+                              />
+                            )}
+                          />
+                          <FieldErrorMsg message={errors.name?.message} />
+                        </div>
+
+                        <div>
+                          <FieldLabel htmlFor="industry-slug">
+                            Slug <span className="text-rose-500">*</span>
+                          </FieldLabel>
+                          <div className="flex gap-2 mt-1">
+                            <Controller
+                              name="slug"
+                              control={control}
+                              render={({ field }) => (
+                                <Input
+                                  id="industry-slug"
+                                  placeholder="industry-slug"
+                                  {...field}
+                                  onFocus={() => setIsSlugManual(true)}
+                                  onBlur={() => {
+                                    if (
+                                      field.value === generateSlug(name ?? "")
+                                    )
+                                      setIsSlugManual(false);
+                                  }}
+                                />
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => checkSlugUnique(slug)}
+                              disabled={checkingSlug || !slug?.trim()}
+                              className="shrink-0 bg-primary/90 text-white hover:bg-primary"
+                            >
+                              {checkingSlug ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                "Check"
+                              )}
+                            </Button>
+                          </div>
+                          <UniquenessResult status={slugCheck} />
+                          <FieldErrorMsg message={errors.slug?.message} />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <FieldLabel htmlFor="industry-short-desc">
+                            Short description
+                          </FieldLabel>
+                          <Controller
+                            name="shortDescription"
+                            control={control}
+                            render={({ field }) => (
+                              <Textarea
+                                id="industry-short-desc"
+                                rows={2}
+                                placeholder="A concise summary for listing pages"
+                                className="mt-1"
+                                {...field}
+                              />
+                            )}
+                          />
+                          <Hint>
+                            Appears in listings. Keep it under 120 characters.
+                          </Hint>
+                        </div>
+                      </div>
+                    </Section>
+
+                    <Section>
+                      <SectionHeader
+                        title="Search Engine Optimization"
+                        desc="Help people find your industry on search engines."
+                        icon={<Search className="size-4" />}
+                      />
+                      <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
+                        <div>
+                          <FieldLabel htmlFor="industry-h1">
+                            H1 tag <span className="text-rose-500">*</span>
+                          </FieldLabel>
+                          <div className="flex gap-2 mt-1">
+                            <Controller
+                              name="h1Tag"
+                              control={control}
+                              render={({ field }) => (
+                                <Input
+                                  id="industry-h1"
+                                  placeholder="e.g., Professional Web Development Services"
+                                  {...field}
+                                  onFocus={() => setIsH1Manual(true)}
+                                  onBlur={() => {
+                                    if (field.value === (name ?? ""))
+                                      setIsH1Manual(false);
+                                  }}
+                                />
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => checkH1TagUnique(h1Tag)}
+                              disabled={checkingH1Tag || !h1Tag?.trim()}
+                              className="shrink-0 bg-primary/90 text-white hover:bg-primary"
+                            >
+                              {checkingH1Tag ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                "Check"
+                              )}
+                            </Button>
+                          </div>
+                          <UniquenessResult status={h1TagCheck} />
+                          <FieldErrorMsg message={errors.h1Tag?.message} />
+                        </div>
+
+                        <div>
+                          <FieldLabel htmlFor="meta-title">
+                            Meta title{" "}
+                            <span className="text-rose-500">*</span>
+                          </FieldLabel>
+                          <div className="flex gap-2 mt-1">
+                            <Controller
+                              name="metaTitle"
+                              control={control}
+                              render={({ field }) => (
+                                <Input
+                                  id="meta-title"
+                                  placeholder="e.g., Web Development Services | Your Company"
+                                  {...field}
+                                  onFocus={() => setIsMetaTitleManual(true)}
+                                  onBlur={() => {
+                                    if (field.value === (name ?? ""))
+                                      setIsMetaTitleManual(false);
+                                  }}
+                                />
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => checkMetaTitleUnique(metaTitle)}
+                              disabled={checkingMetaTitle || !metaTitle?.trim()}
+                              className="shrink-0 bg-primary/90 text-white hover:bg-primary"
+                            >
+                              {checkingMetaTitle ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                "Check"
+                              )}
+                            </Button>
+                          </div>
+                          <UniquenessResult status={metaTitleCheck} />
+                          <FieldErrorMsg message={errors.metaTitle?.message} />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <div className="mb-1.5 flex items-baseline justify-between">
+                            <FieldLabel htmlFor="industry-meta-desc">
+                              Meta description
+                            </FieldLabel>
+                            <span
+                              className={`text-xs font-medium ${descTone}`}
+                            >
+                              {descLength}/{META_DESCRIPTION_MAX}
+                            </span>
+                          </div>
+                          <Controller
+                            name="metaDescription"
+                            control={control}
+                            render={({ field }) => (
+                              <Textarea
+                                id="industry-meta-desc"
+                                rows={3}
+                                placeholder="Summarize the industry for search engines, ideally 150–160 characters"
+                                {...field}
+                              />
+                            )}
+                          />
+                          <Hint>
+                            Appears in Google search results under the title.
+                          </Hint>
+                          <FieldErrorMsg
+                            message={errors.metaDescription?.message}
+                          />
+                        </div>
+                      </div>
+                    </Section>
+                  </div>
+                )}
+
+                {/* ---------- CONTENT ---------- */}
+                {activeTab === "content" && (
+                  <div className="space-y-5">
+                    <Section>
+                      <SectionHeader
+                        title="Detailed Content"
+                        desc="Long-form content that supports this industry."
+                        icon={<FiGrid className="size-4" />}
+                      />
+                      <Controller
+                        name="content"
+                        control={control}
+                        render={({ field }) => (
+                          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                            <TiptopTextEditor
+                              height="h-72"
+                              initialValue={field.value}
+                              onChange={field.onChange}
+                            />
+                          </div>
+                        )}
+                      />
+                    </Section>
+                  </div>
+                )}
+
+                {/* ---------- MEDIA ---------- */}
+                {activeTab === "media" && (
+                  <div className="space-y-5">
+                    <Section>
+                      <SectionHeader
+                        title="Industry Images"
+                        desc="Each slot takes a single image. Add alt text for accessibility and SEO."
+                        icon={<FiImage className="size-4" />}
+                      />
+
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                        {renderImageCard("imageUrl", "Primary image")}
+                        {renderImageCard("bannerImage", "Banner image")}
+                        {renderImageCard("iconImageUrl", "Icon image")}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                        {checks.map((c) => (
+                          <span
+                            key={c.label}
+                            className={`flex items-center gap-1.5 text-xs font-medium ${
+                              c.ok ? "text-emerald-600" : "text-rose-600"
+                            }`}
+                          >
+                            {c.ok ? (
+                              <FiCheckCircle className="size-3.5" />
+                            ) : (
+                              <FiXCircle className="size-3.5" />
+                            )}
+                            {c.label}
+                          </span>
+                        ))}
+                        <span className="ml-auto text-xs text-slate-400">
+                          {validation.slotsFilled}/3 slots filled
+                        </span>
+                      </div>
+
+                      <FieldErrorMsg
+                        message={
+                          errors.imageUrl?.message ||
+                          errors.bannerImage?.message ||
+                          errors.iconImageUrl?.message
+                        }
+                      />
+
+                      <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-4">
+                        <h3 className="mb-2 text-xs font-semibold text-sky-800">
+                          Image guidelines
+                        </h3>
+                        <ul className="space-y-1 text-[11px] text-sky-600">
+                          <li>• Primary image: square (1:1)</li>
+                          <li>• Banner image: wide (3:1) recommended</li>
+                          <li>• Icon image: simple, recognizable (1:1)</li>
+                          <li>• Supported formats: JPG, PNG, SVG, WebP</li>
+                        </ul>
+                      </div>
+                    </Section>
+                  </div>
+                )}
+
+                {/* ---------- DETAILS ---------- */}
+                {activeTab === "details" && (
+                  <div className="space-y-5">
+
+                    <Section>
+                      <SectionHeader
+                        title="FAQs"
+                        desc="Answer common questions to build trust."
+                        icon={<FiHelpCircle className="size-4" />}
+                      />
+                      <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 mb-4">
+                        <div className="grid gap-3">
+                          <div>
+                            <FieldLabel htmlFor="faq-question">
+                              Question
+                            </FieldLabel>
+                            <Input
+                              id="faq-question"
+                              name="question"
+                              value={currentFaq.question}
+                              onChange={handleFaqChange}
+                              placeholder="e.g., What services are included?"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <FieldLabel htmlFor="faq-answer">Answer</FieldLabel>
+                            <Textarea
+                              id="faq-answer"
+                              name="answer"
+                              value={currentFaq.answer}
+                              onChange={handleFaqChange}
+                              placeholder="Write a clear, helpful answer"
+                              rows={2}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={addOrUpdateFaq}
+                            >
+                              {editingFaqIndex !== null
+                                ? "Update FAQ"
+                                : "Add FAQ"}
+                            </Button>
+                            {editingFaqIndex !== null && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={cancelEditFaq}
+                              >
+                                Cancel
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {faqs && faqs.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="mb-2 flex items-center gap-2">
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Published FAQs
+                            </h3>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                              {faqs.length}
+                            </span>
+                          </div>
+                          {faqs.map((faq, index) => (
+                            <div
+                              key={`${faq.question}-${index}`}
+                              className={`flex items-start justify-between gap-4 rounded-lg border bg-white p-3 transition ${
+                                editingFaqIndex === index
+                                  ? "border-emerald-300 ring-1 ring-emerald-200"
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-slate-800">
+                                  {faq.question}
+                                </p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                  {faq.answer}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => editFaq(index)}
+                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                >
+                                  <FiEdit2 className="size-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteFaq(index)}
+                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                >
+                                  <FiTrash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {(!faqs || faqs.length === 0) && (
+                        <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 py-6 text-center text-slate-400">
+                          <FiHelpCircle className="size-5" />
+                          <p className="text-xs">
+                            No FAQs yet — add your first one above.
+                          </p>
+                        </div>
+                      )}
+                    </Section>
+
+                    <Section>
+                      <SectionHeader
+                        title="Publishing"
+                        desc="Control when and where this industry is visible."
+                        icon={<FiSettings className="size-4" />}
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <FieldLabel htmlFor="status">Status</FieldLabel>
+                          <Controller
+                            name="status"
+                            control={control}
+                            render={({ field }) => (
+                              <select
+                                id="status"
+                                {...field}
+                                className="w-full px-3 py-2 bg-white border border-slate-300 outline-none rounded-lg text-sm text-slate-700 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition mt-1"
+                              >
+                                <option value="DRAFT">
+                                  Draft — hidden from public
+                                </option>
+                                <option value="PUBLISHED">
+                                  Published — visible on site
+                                </option>
+                              </select>
+                            )}
+                          />
+                          <FieldErrorMsg message={errors.status?.message} />
+                        </div>
+                        
+                      </div>
+                    </Section>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* ============ Footer ============ */}
+            <DialogFooter className="border-t border-slate-200 bg-white px-6 py-3 flex items-center justify-between">
+              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+                <Check className="size-3.5 text-emerald-500" />
+                All changes saved locally — click{" "}
+                {isEditMode ? "Update" : "Create"} to submit.
+              </div>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onCancel}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="min-w-[140px] bg-primary/90 hover:bg-primary"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <LoaderCircle className="animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>{isEditMode ? "Update Industry" : "Create Industry"}</>
+                  )}
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {showGallery && (
+        <WebsiteGalleryModel
+          onCancel={handleGalleryClose}
+          onSentSelected={handleGallerySelect}
+          mode="single"
+        />
+      )}
+    </>
+  );
 };
 
 export default AddIndustry;
