@@ -1537,7 +1537,7 @@ const AddProduct = ({
                         </ScrollArea>
 
                         {/* ---------------- Footer ---------------- */}
-                        <DialogFooter className="border-t border-border bg-white w-full px-6 py-4 flex items-center justify-end gap-2 absolute bottom-0 left-0 right-0">
+                        <DialogFooter className="border-t border-border bg-white w-full px-6 py-4 flex items-center justify-end gap-2 absolute bottom-0 left-0 right-0 z-20">
                             <Button
                                 type="button"
                                 variant="outline"

@@ -1,20 +1,28 @@
-
 'use client';
-
-import { RichTextEditor } from '@mantine/tiptap';
+import { RichTextEditor, Link } from '@mantine/tiptap';
 import { MantineProvider } from '@mantine/core';
 import { useEditor } from '@tiptap/react';
-import { CiViewTable } from "react-icons/ci";
+import { CiViewTable } from 'react-icons/ci';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
 import { TableKit } from '@tiptap/extension-table';
-import { CiImageOn } from "react-icons/ci";
+import { CiImageOn } from 'react-icons/ci';
 import { useState } from 'react';
-import { LuArrowDown, LuArrowLeft, LuArrowRight, LuArrowUp, LuColumns2, LuMerge, LuRows2, LuSplit, LuTableProperties, LuTrash2 } from 'react-icons/lu';
-
+import {
+  LuArrowDown,
+  LuArrowLeft,
+  LuArrowRight,
+  LuArrowUp,
+  LuColumns2,
+  LuMerge,
+  LuRows2,
+  LuSplit,
+  LuTableProperties,
+  LuTrash2,
+} from 'react-icons/lu';
 
 type EditorProps = {
   height?: string;
@@ -28,9 +36,22 @@ export default function TiptopTextEditor({
   onChange,
 }: EditorProps) {
   const [showTableControls, setShowTableControls] = useState(false);
+
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      // ✅ Disable StarterKit's built-in Link so we can configure our own
+      StarterKit.configure({ link: false }),
+
+      // ✅ SEO FIX: no nofollow, keep security attrs only
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        HTMLAttributes: {
+          rel: 'noopener noreferrer',
+          target: '_blank',
+        },
+      }),
+
       Image,
       Subscript,
       Superscript,
@@ -53,11 +74,7 @@ export default function TiptopTextEditor({
     editor
       .chain()
       .focus()
-      .insertTable({
-        rows: 3,
-        cols: 3,
-        withHeaderRow: true,
-      })
+      .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
       .run();
   };
 
@@ -66,78 +83,20 @@ export default function TiptopTextEditor({
     const tablePositions: number[] = [];
 
     state.doc.descendants((node, pos) => {
-      if (node.type.name === 'table') {
-        tablePositions.push(pos);
-      }
+      if (node.type.name === 'table') tablePositions.push(pos);
     });
 
     if (!tablePositions.length) return;
 
     const transaction = state.tr;
-
-    tablePositions
-      .reverse()
-      .forEach((pos) => {
-        const node = transaction.doc.nodeAt(pos);
-        if (node) {
-          transaction.delete(pos, pos + node.nodeSize);
-        }
-      });
+    tablePositions.reverse().forEach((pos) => {
+      const node = transaction.doc.nodeAt(pos);
+      if (node) transaction.delete(pos, pos + node.nodeSize);
+    });
 
     view.dispatch(transaction);
     setShowTableControls(false);
   };
-
-  // const tableControls = [
-  //   {
-  //     label: 'Add Row Above',
-  //     action: () => editor.chain().focus().addRowBefore().run(),
-  //   },
-  //   {
-  //     label: 'Add Row Below',
-  //     action: () => editor.chain().focus().addRowAfter().run(),
-  //   },
-  //   {
-  //     label: 'Delete Row',
-  //     action: () => editor.chain().focus().deleteRow().run(),
-  //   },
-  //   {
-  //     label: 'Add Column Before',
-  //     action: () => editor.chain().focus().addColumnBefore().run(),
-  //   },
-  //   {
-  //     label: 'Add Column After',
-  //     action: () => editor.chain().focus().addColumnAfter().run(),
-  //   },
-  //   {
-  //     label: 'Delete Column',
-  //     action: () => editor.chain().focus().deleteColumn().run(),
-  //   },
-  //   {
-  //     label: 'Toggle Header Row',
-  //     action: () => editor.chain().focus().toggleHeaderRow().run(),
-  //   },
-  //   {
-  //     label: 'Merge Cells',
-  //     action: () => editor.chain().focus().mergeCells().run(),
-  //   },
-  //   {
-  //     label: 'Split Cell',
-  //     action: () => editor.chain().focus().splitCell().run(),
-  //   },
-  //   {
-  //     label: 'Delete Table',
-  //     action: () => editor.chain().focus().deleteTable().run(),
-  //   },
-  //   {
-  //     label: 'Next Cell',
-  //     action: () => editor.chain().focus().goToNextCell().run(),
-  //   },
-  //   {
-  //     label: 'Previous Cell',
-  //     action: () => editor.chain().focus().goToPreviousCell().run(),
-  //   },
-  // ];
 
   const tableControls = [
     { label: 'Add Row Above', icon: <LuArrowUp />, action: () => editor.chain().focus().addRowBefore().run() },
@@ -153,21 +112,31 @@ export default function TiptopTextEditor({
     { label: 'Next Cell', icon: <LuArrowDown />, action: () => editor.chain().focus().goToNextCell().run() },
     { label: 'Previous Cell', icon: <LuArrowUp />, action: () => editor.chain().focus().goToPreviousCell().run() },
   ];
+
   return (
     <MantineProvider>
+      {/* ✅ Global style for blue links inside editor AND rendered content */}
+      <style>{`
+        .tiptap-content a,
+        .ProseMirror a {
+          color: #2563eb;          /* blue-600 */
+          text-decoration: underline;
+          text-underline-offset: 3px;
+          transition: color .15s ease;
+        }
+        .tiptap-content a:hover,
+        .ProseMirror a:hover {
+          color: #1d4ed8;          /* blue-700 */
+        }
+      `}</style>
+
       <RichTextEditor editor={editor}>
-        <RichTextEditor.Toolbar
-          sticky
-          stickyOffset={0}
-          className="bg-white z-10"
-        >
-          {/* History */}
+        <RichTextEditor.Toolbar sticky stickyOffset={0} className="bg-white z-10">
           <RichTextEditor.ControlsGroup>
             <RichTextEditor.Undo />
             <RichTextEditor.Redo />
           </RichTextEditor.ControlsGroup>
 
-          {/* Headings */}
           <RichTextEditor.ControlsGroup>
             <RichTextEditor.H1 />
             <RichTextEditor.H2 />
@@ -175,7 +144,6 @@ export default function TiptopTextEditor({
             <RichTextEditor.H4 />
           </RichTextEditor.ControlsGroup>
 
-          {/* Text Formatting */}
           <RichTextEditor.ControlsGroup>
             <RichTextEditor.Bold />
             <RichTextEditor.Italic />
@@ -185,25 +153,21 @@ export default function TiptopTextEditor({
             <RichTextEditor.ClearFormatting />
           </RichTextEditor.ControlsGroup>
 
-          {/* Lists */}
           <RichTextEditor.ControlsGroup>
             <RichTextEditor.BulletList />
             <RichTextEditor.OrderedList />
           </RichTextEditor.ControlsGroup>
 
-          {/* Links */}
           <RichTextEditor.ControlsGroup>
             <RichTextEditor.Link />
             <RichTextEditor.Unlink />
           </RichTextEditor.ControlsGroup>
 
-          {/* Script */}
           <RichTextEditor.ControlsGroup>
             <RichTextEditor.Subscript />
             <RichTextEditor.Superscript />
           </RichTextEditor.ControlsGroup>
 
-          {/* Alignment */}
           <RichTextEditor.ControlsGroup>
             <RichTextEditor.AlignLeft />
             <RichTextEditor.AlignCenter />
@@ -217,9 +181,7 @@ export default function TiptopTextEditor({
               onClick={() => {
                 const url = window.prompt('Image URL');
                 if (!url) return;
-
                 const alt = window.prompt('Alt text') || '';
-
                 editor.chain().focus().setImage({ src: url, alt }).run();
               }}
               aria-label="Insert image"
@@ -235,57 +197,48 @@ export default function TiptopTextEditor({
               onClick={insertTable}
               aria-label="Insert table"
               title="Insert 3 x 3 table"
-            ><CiViewTable />
+            >
+              <CiViewTable />
             </RichTextEditor.Control>
           </RichTextEditor.ControlsGroup>
 
-          {
-            showTableControls && (
-              <RichTextEditor.ControlsGroup>
+          {showTableControls && (
+            <RichTextEditor.ControlsGroup>
+              <RichTextEditor.Control
+                onClick={removeAllTables}
+                aria-label="Remove all tables"
+                title="Remove all tables"
+              >
+                <span className="text-[11px] px-2 font-medium text-red-600">
+                  Remove All Tables
+                </span>
+              </RichTextEditor.Control>
+            </RichTextEditor.ControlsGroup>
+          )}
+
+          {showTableControls && (
+            <RichTextEditor.ControlsGroup>
+              {tableControls.map((control) => (
                 <RichTextEditor.Control
-                  onClick={removeAllTables}
-                  aria-label="Remove all tables"
-                  title="Remove all tables"
+                  key={control.label}
+                  onClick={control.action}
+                  aria-label={control.label}
+                  title={control.label}
+                  className={`
+                    w-8! h-8! min-w-8! p-0! text-xs
+                    flex items-center justify-center
+                    rounded-md transition-colors
+                    ${control.danger
+                      ? 'text-red-500 hover:bg-red-50!'
+                      : 'text-gray-600 hover:bg-blue-50! hover:text-blue-600!'
+                    }
+                  `}
                 >
-                  <span className="text-[11px] px-2 font-medium text-red-600">
-                    Remove All Tables
-                  </span>
+                  {control.icon}
                 </RichTextEditor.Control>
-              </RichTextEditor.ControlsGroup>
-            )
-          }
-
-
-
-          {/* Table Operations */}
-          {
-            showTableControls && (
-              <RichTextEditor.ControlsGroup>
-                {tableControls.map((control) => (
-                  <RichTextEditor.Control
-                    key={control.label}
-                    onClick={control.action}
-                    aria-label={control.label}
-                    title={control.label}
-                    className={`
-                        w-8! h-8! min-w-8! p-0! text-xs
-                        flex items-center justify-center
-                        rounded-md transition-colors
-                        ${control.danger
-                        ? 'text-red-500 hover:bg-red-50!'
-                        : 'text-gray-600 hover:bg-blue-50! hover:text-blue-600!'
-                      }
-                    `}
-                  >
-                    {control.icon}
-                  </RichTextEditor.Control>
-                ))}
-              </RichTextEditor.ControlsGroup>
-            )
-          }
-
-
-
+              ))}
+            </RichTextEditor.ControlsGroup>
+          )}
         </RichTextEditor.Toolbar>
 
         <RichTextEditor.Content
