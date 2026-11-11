@@ -1,17 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FieldError, FieldLabel } from "@/components/ui/field";
+import AsyncSelect from "react-select/async";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Box, LoaderCircle, Search, Check, ChevronRight, Info } from "lucide-react";
+import { Box, LoaderCircle, Search, Check, ChevronRight, Info, PackageSearch } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { generateSlug } from "@/helpers/slug-maker";
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
 import {
     CHECK_PRODUCT_H1_TAG_UNIQUE, CHECK_PRODUCT_META_TITLE_UNIQUE,
-    CHECK_PRODUCT_SLUG_UNIQUE, CREATE_PRODUCT, UPDATE_PRODUCT
+    CHECK_PRODUCT_SLUG_UNIQUE, CREATE_PRODUCT, SEARCH_PRODUCTS, UPDATE_PRODUCT
 } from "@/graphql/current-website-queries/product.query";
 import {
     FiCheckCircle, FiChevronDown, FiChevronUp, FiDollarSign, FiEdit2,
@@ -28,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { removeTypename } from "@/helpers/removetypename";
 import { useAppSelector } from "@/redux/hooks";
 import { toast } from "sonner";
+import { FaProductHunt } from "react-icons/fa";
 
 /* ============================================================
  * GraphQL
@@ -69,6 +71,12 @@ const productFormSchema = z.object({
     faqs: z.array(z.any()).default([]),
     status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
     isFeatured: z.boolean().default(false),
+    relatedProducts: z.array(z.object({
+        pid: z.string(),
+        name: z.string(),
+        slug: z.string(),
+        imageUrl: z.object({ url: z.string().optional(), alt: z.string().optional() }).optional(),
+    })).default([]),
 });
 
 /* ============================================================
@@ -149,6 +157,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
             moq: selectedData?.moq || "",
             status: selectedData?.status || "DRAFT",
             isFeatured: selectedData?.isFeatured || false,
+            relatedProducts: selectedData?.relatedProducts ?? [],
         }
     });
 
@@ -165,15 +174,17 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
     const selectedIndustries = watch("industries") ?? [];
     const selectedMaterials = watch("materials") ?? [];
     const selectedStyles = watch("styles") ?? [];
-
+    const relatedProducts = watch("relatedProducts") ?? [];
 
     /* -------- Submit -------- */
     const onSubmit = async (values: any) => {
+        console.log({ submitResult: values })
         if (values.imageUrl.length < IMAGE_MIN) { toast.error(`Please add at least ${IMAGE_MIN} image`); return; }
         if (values.imageUrl.length > IMAGE_MAX) { toast.error(`Max ${IMAGE_MAX} images`); return; }
         if (!companyMember?.id) { toast.error("Unable to identify the current user."); return; }
 
         const clean = removeTypename(values);
+        console.log({ submitcleanResult: clean })
         try {
             if (isEditMode && selectedData?.id) {
                 const result = await updateProduct({ variables: { id: selectedData.id, input: clean } });
@@ -196,6 +207,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
     const [checkSlug, { loading: checkingSlug, data: slugData, error: slugError }] = useLazyQuery<any>(CHECK_PRODUCT_SLUG_UNIQUE, { fetchPolicy: "network-only" });
     const [checkH1Tag, { loading: checkingH1Tag, data: h1TagData, error: h1TagError }] = useLazyQuery<any>(CHECK_PRODUCT_H1_TAG_UNIQUE, { fetchPolicy: "network-only" });
     const [checkMetaTitle, { loading: checkingMetaTitle, data: metaTitleData, error: metaTitleError }] = useLazyQuery<any>(CHECK_PRODUCT_META_TITLE_UNIQUE, { fetchPolicy: "network-only" });
+    const [getRelatedProducts] = useLazyQuery<any>(SEARCH_PRODUCTS, { fetchPolicy: "network-only" });
 
     const { data: industriesData, error: industriesError } = useQuery<any>(GET_INDUSTRIES, { fetchPolicy: "network-only" });
     const { data: materialsData, error: materialsError } = useQuery<any>(GET_MATERIALS, { fetchPolicy: "network-only" });
@@ -293,6 +305,39 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
         setValue(field, next, { shouldValidate: true, shouldDirty: true });
     };
 
+
+
+    /* -------- Related product async search -------- */
+    const mapProductToOption = (p: any) => ({
+        value: p.id,          // query now returns `id`
+        label: p.name,
+        slug: p.slug,
+        imageUrl: p.imageUrl[0],
+    });
+
+    const loadRelatedProductOptions = async (inputValue: string) => {
+        try {
+            const result = await getRelatedProducts({
+                variables: {
+                    search: inputValue || undefined,
+                },
+            });
+            // query returns a plain array
+            const list = result.data?.getRelatedProducts ?? [];
+            return list
+                .filter((p: any) => p.id !== selectedData?.id)   // exclude current product when editing
+                .map(mapProductToOption);
+        } catch (err: any) {
+            // react-select aborts stale requests — this is expected, not an error
+            if (err?.name === "AbortError" || err?.message?.includes("aborted")) {
+                return [];
+            }
+            console.error("Failed to load products", err);
+            return [];
+        }
+    };
+
+
     /* ============================================================
      * Multi-select render (improved)
      * ============================================================ */
@@ -305,7 +350,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
             <FieldLabel>{label}</FieldLabel>
             <button
                 type="button"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm text-slate-700 shadow-xs text-left flex justify-between items-center transition hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm text-slate-700 shadow-xs text-left flex justify-between items-center transition hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 onClick={(e) => { e.stopPropagation(); onToggleOpen(); }}
                 aria-haspopup="listbox" aria-expanded={isOpen}
             >
@@ -325,7 +370,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                         const checked = selectedIds.includes(opt.id);
                         return (
                             <label key={opt.id} className={`flex items-center px-3 py-2 cursor-pointer text-sm transition ${checked ? "bg-indigo-50/70" : "hover:bg-slate-50"}`}>
-                                <input type="checkbox" checked={checked} onChange={() => onToggleItem(opt.id)} className="mr-2 size-4 rounded border-slate-300 text-primary/90 focus:ring-indigo-500" />
+                                <input type="checkbox" checked={checked} onChange={() => onToggleItem(opt.id)} className="mr-2 size-4 rounded border-slate-300 text-primary/90 focus:ring-primary" />
                                 <span className={checked ? "font-medium text-slate-800" : "text-slate-600"}>{opt.name}</span>
                             </label>
                         );
@@ -353,13 +398,14 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
     /* ============================================================
      * Tab layout
      * ============================================================ */
-    const [activeTab, setActiveTab] = useState<"basic" | "content" | "media" | "details">("basic");
+    const [activeTab, setActiveTab] = useState<"basic" | "content" | "media" | "details" | "relatedProducts">("basic");
 
     const tabs: { id: typeof activeTab; label: string; icon: React.ReactNode }[] = [
         { id: "basic", label: "Basics", icon: <Box className="size-4" /> },
         { id: "content", label: "Content & SEO", icon: <FiFileText className="size-4" /> },
         { id: "media", label: "Media & Pricing", icon: <FiImage className="size-4" /> },
         { id: "details", label: "Details & Settings", icon: <FiLayers className="size-4" /> },
+        { id: "relatedProducts", label: "Related Products", icon: <PackageSearch className="size-4" /> },
     ];
 
     return (
@@ -370,7 +416,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                     <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-white">
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-md shadow-indigo-500/30">
+                                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-md shadow-primary/30">
                                     <Box size={20} strokeWidth={1.8} />
                                 </div>
                                 <div>
@@ -394,7 +440,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                         type="button"
                                         onClick={() => setActiveTab(t.id)}
                                         className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${active
-                                            ? "border-indigo-500 text-primary/90"
+                                            ? "border-primary text-primary/90"
                                             : "border-transparent text-slate-500 hover:text-slate-800"
                                             }`}
                                     >
@@ -585,7 +631,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                                 ))}
                                                 {(imageUrl?.length ?? 0) < IMAGE_MAX && (
                                                     <button type="button" onClick={() => setShowGallery(true)}
-                                                        className="flex size-40 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 transition hover:border-indigo-500 hover:bg-indigo-50 hover:text-primary/90">
+                                                        className="flex size-40 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 transition hover:border-primary hover:bg-indigo-50 hover:text-primary/90">
                                                         <FiUploadCloud className="size-7" />
                                                         <span className="text-xs font-medium">Add image</span>
                                                     </button>
@@ -675,7 +721,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                                         {tags.map((tag) => (
                                                             <span key={tag} className="flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-primary">
                                                                 {tag}
-                                                                <button type="button" onClick={() => removeTag(tag)} className="rounded-full p-0.5 text-indigo-400 hover:bg-indigo-100 hover:text-rose-600" aria-label={`Remove ${tag}`}>
+                                                                <button type="button" onClick={() => removeTag(tag)} className="rounded-full p-0.5 text-primary hover:bg-indigo-100 hover:text-rose-600" aria-label={`Remove ${tag}`}>
                                                                     <FiX className="size-3" />
                                                                 </button>
                                                             </span>
@@ -750,7 +796,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                                     <FieldLabel htmlFor="status">Status</FieldLabel>
                                                     <Controller name="status" control={control} render={({ field }) => (
                                                         <select id="status" {...field}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-300 outline-none rounded-lg text-sm text-slate-700 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition mt-1">
+                                                            className="w-full px-3 py-2 bg-white border border-slate-300 outline-none rounded-lg text-sm text-slate-700 shadow-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
                                                             <option value="DRAFT">Draft — hidden from public</option>
                                                             <option value="PUBLISHED">Published — visible on site</option>
                                                         </select>
@@ -769,6 +815,115 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                             </div>
                                         </Section>
                                     </div>
+                                )}
+
+                                {activeTab === "relatedProducts" && (
+                                    <Section>
+                                        <SectionHeader
+                                            title="Related Products"
+                                            desc="Link complementary products to display on the product detail page."
+                                            icon={<FiLayers className="size-4" />}
+                                        />
+                                        <div>
+                                            <FieldLabel>Select related products</FieldLabel>
+                                            <div className="mt-1">
+                                                <AsyncSelect
+                                                    isMulti
+                                                    cacheOptions
+                                                    defaultOptions
+                                                    loadOptions={loadRelatedProductOptions}
+                                                    placeholder="Search products..."
+                                                    value={(relatedProducts ?? []).map((p) => ({
+                                                        value: p.pid,
+                                                        label: p.name,
+                                                        slug: p.slug,
+                                                        imageUrl: p.imageUrl,
+                                                    }))}
+                                                    onChange={(selected) => {
+                                                        const next = (selected ?? []).map((item: any) => ({
+                                                            pid: item.value,
+                                                            name: item.label,
+                                                            slug: item.slug,
+                                                            imageUrl: item.imageUrl,
+                                                        }));
+                                                        setValue("relatedProducts", next, { shouldValidate: true, shouldDirty: true });
+                                                    }}
+                                                    styles={{
+                                                        control: (base) => ({
+                                                            ...base,
+                                                            minHeight: 38,
+                                                            borderColor: "#cbd5e1",
+                                                            boxShadow: "none",
+                                                            "&:hover": { borderColor: "#818cf8" },
+                                                        }),
+                                                        multiValue: (base) => ({
+                                                            ...base,
+                                                            backgroundColor: "#eef2ff",
+                                                            color: "#4338ca",
+                                                        }),
+                                                        multiValueLabel: (base) => ({
+                                                            ...base,
+                                                            color: "#4338ca",
+                                                            fontWeight: 500,
+                                                        }),
+                                                        multiValueRemove: (base) => ({
+                                                            ...base,
+                                                            color: "#6366f1",
+                                                            "&:hover": { backgroundColor: "#e0e7ff", color: "#dc2626" },
+                                                        }),
+                                                    }}
+                                                />
+                                            </div>
+                                            <Hint>Search by product name. Changes are saved when you submit the form.</Hint>
+                                            <FieldErrorMsg message={errors.relatedProducts?.message as string} />
+                                        </div>
+
+                                        {/* Selected products preview */}
+                                        {relatedProducts.length > 0 && (
+                                            <div className="mt-4 space-y-2">
+                                                <div className="mb-2 flex items-center gap-2">
+                                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected products</h3>
+                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                                                        {relatedProducts.length}
+                                                    </span>
+                                                </div>
+                                                {relatedProducts.map((p, idx) => (
+                                                    <div
+                                                        key={`${p.pid}-${idx}`}
+                                                        className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 transition hover:border-slate-300"
+                                                    >
+                                                        {p.imageUrl?.url ? (
+                                                            <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-slate-100">
+                                                                <Image src={p.imageUrl.url} alt={p.imageUrl.alt || p.name} fill className="object-cover" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-400">
+                                                                <FiImage className="size-4" />
+                                                            </div>
+                                                        )}
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
+                                                            <p className="truncate text-xs text-slate-500">/products/{p.slug}</p>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setValue(
+                                                                    "relatedProducts",
+                                                                    relatedProducts.filter((_, i) => i !== idx),
+                                                                    { shouldValidate: true, shouldDirty: true }
+                                                                )
+                                                            }
+                                                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                                            aria-label={`Remove ${p.name}`}
+                                                        >
+                                                            <FiTrash2 className="size-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </Section>
                                 )}
                             </div>
                         </ScrollArea>

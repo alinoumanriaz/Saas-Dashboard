@@ -30,6 +30,7 @@ export const GET_PAGINATED_MATERIALS = gql`
           answer
           order
         }
+        status
         createdAt
         updatedAt
       }
@@ -84,6 +85,7 @@ export const GET_ALL_MATERIALS = gql`
           answer
           order
         }
+      status
       createdAt
       updatedAt
     }

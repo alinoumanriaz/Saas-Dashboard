@@ -1,81 +1,43 @@
-import CardWithTitleAndIcon from "@/components/CardWithTitleAndIcon";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { FieldError, FieldLabel } from "@/components/ui/field";
+import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { FieldLabel } from "@/components/ui/field";
+import AsyncSelect from "react-select/async";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Box, LoaderCircle, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Box, LoaderCircle, Search, Check, Info, PackageSearch, Layers, Image as ImageIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { generateSlug } from "@/helpers/slug-maker";
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
-import { CHECK_LOCATION_PAGES_H1_TAG_UNIQUE, CHECK_LOCATION_PAGES_META_TITLE_UNIQUE, CHECK_LOCATION_PAGES_SLUG_UNIQUE, CREATE_LOCATION_PAGES, UPDATE_LOCATION_PAGES } from "@/graphql/current-website-queries/location-page.query";
 import {
-    FiCheckCircle,
-    FiChevronDown,
-    FiChevronUp,
-    FiDollarSign,
-    FiEdit2,
-    FiFileText,
-    FiGrid,
-    FiHelpCircle,
-    FiImage,
-    FiStar,
-    FiTag,
-    FiTrash2,
-    FiUploadCloud,
-    FiX,
-    FiXCircle,
+    CHECK_LOCATION_PAGES_H1_TAG_UNIQUE,
+    CHECK_LOCATION_PAGES_META_TITLE_UNIQUE,
+    CHECK_LOCATION_PAGES_SLUG_UNIQUE,
+    CREATE_LOCATION_PAGES,
+    UPDATE_LOCATION_PAGES,
+} from "@/graphql/current-website-queries/location-page.query";
+import {
+    FiCheckCircle, FiChevronDown, FiChevronUp, FiEdit2, FiFileText, FiGrid,
+    FiHelpCircle, FiImage, FiLayers, FiSettings, FiTag, FiTrash2, FiUploadCloud, FiX, FiXCircle,
 } from "react-icons/fi";
 import z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TiptopTextEditor from "@/components/TiptopTextEditor";
 import Image from "next/image";
 import WebsiteGalleryModel from "./WebsiteGallery.model";
-import { gql } from "@apollo/client";
-import { Switch } from "@/components/ui/switch";
 import { removeTypename } from "@/helpers/removetypename";
 import { useAppSelector } from "@/redux/hooks";
 import { toast } from "sonner";
+import { SEARCH_PRODUCTS } from "@/graphql/current-website-queries/product.query";
 
 /* ============================================================
- * GraphQL queries for dropdown data
+ * Constants
  * ============================================================ */
-const GET_INDUSTRIES = gql`
-    query findAllIndustries {
-        findAllIndustries {
-            id
-            name
-        }
-    }
-`;
-const GET_MATERIALS = gql`
-    query findAllMaterials {
-        findAllMaterials {
-            id
-            name
-        }
-    }
-`;
-const GET_STYLES = gql`
-    query findAllStyles {
-        findAllStyles {
-            id
-            name
-        }
-    }
-`;
-
 const IMAGE_MIN = 1;
 const IMAGE_MAX = 10;
 const META_DESCRIPTION_MAX = 160;
 const ALT_TEXT_MAX = 125;
-
-interface LookupOption {
-    id: string;
-    name: string;
-}
 
 interface AddlocationPageProps {
     onCancel: () => void;
@@ -84,14 +46,16 @@ interface AddlocationPageProps {
     refetch?: () => void;
 }
 
+/* ============================================================
+ * Zod schema
+ * ============================================================ */
 const locationPageFormSchema = z.object({
-    name: z.string().min(1, "locationPage name is required"),
+    name: z.string().min(1, "Location page name is required"),
     slug: z
         .string()
         .min(1, "Slug is required")
         .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-            message:
-                "Slug can only contain lowercase letters, numbers, and hyphens",
+            message: "Slug can only contain lowercase letters, numbers, and hyphens",
         }),
     h1Tag: z.string().min(1, "H1 Tag is required"),
     metaTitle: z.string().min(1, "Meta Title is required"),
@@ -111,21 +75,71 @@ const locationPageFormSchema = z.object({
     tags: z.array(z.string()).default([]),
     faqs: z.array(z.any()).default([]),
     status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
+    box: z
+        .object({
+            boxTitle: z.string().optional(),
+            boxContent: z.string().optional(),
+            rightImage: z
+                .object({
+                    url: z.string().optional(),
+                    alt: z.string().optional(),
+                })
+                .optional(),
+        })
+        .default({}),
+    relatedProducts: z
+        .array(
+            z.object({
+                pid: z.string(),
+                name: z.string(),
+                slug: z.string(),
+                imageUrl: z
+                    .object({ url: z.string().optional(), alt: z.string().optional() })
+                    .optional(),
+            })
+        )
+        .default([]),
 });
 
-const AddlocationPage = ({
-    onCancel,
-    selectedData,
-    isEditMode = false,
-    refetch,
-}: AddlocationPageProps) => {
-    const companyMember = useAppSelector(
-        (state) => state.currentCompanyMember?.companyMember
-    );
-    const [loading, setLoading] = useState(false);
+/* ============================================================
+ * Reusable UI helpers (same as AddProduct)
+ * ============================================================ */
+const FieldErrorMsg = ({ message }: { message?: string }) =>
+    message ? (
+        <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-rose-600">
+            <FiXCircle className="size-3.5 shrink-0" />{message}
+        </p>
+    ) : null;
+
+const Hint = ({ children }: { children: React.ReactNode }) => (
+    <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+        <Info className="size-3" /> {children}
+    </p>
+);
+
+const SectionHeader = ({ title, desc, icon }: { title: string; desc: string; icon: React.ReactNode }) => (
+    <div className="flex items-start gap-3 mb-4">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-primary/90 ring-1 ring-indigo-100">
+            {icon}
+        </div>
+        <div>
+            <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+        </div>
+    </div>
+);
+
+const Section = ({ children }: { children: React.ReactNode }) => (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">{children}</div>
+);
+
+/* ============================================================
+ * Component
+ * ============================================================ */
+const AddlocationPage = ({ onCancel, selectedData, isEditMode = false, refetch }: AddlocationPageProps) => {
+    const companyMember = useAppSelector((state) => state.currentCompanyMember?.companyMember);
+
     const [isSlugManual, setIsSlugManual] = useState(isEditMode);
-    const [isH1Manual, setIsH1Manual] = useState(isEditMode);
-    const [isMetaTitleManual, setIsMetaTitleManual] = useState(isEditMode);
     const [slugCheck, setSlugCheck] = useState("");
     const [h1TagCheck, setH1TagCheck] = useState("");
     const [metaTitleCheck, setMetaTitleCheck] = useState("");
@@ -134,20 +148,14 @@ const AddlocationPage = ({
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [altInput, setAltInput] = useState("");
 
+    const [showBoxGallery, setShowBoxGallery] = useState(false);
+
     const [currentFaq, setCurrentFaq] = useState({ question: "", answer: "" });
     const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
-
     const [tagInput, setTagInput] = useState("");
 
-    const [industriesDropdown, setIndustriesDropdown] = useState<LookupOption[]>([]);
-    const [materialsDropdown, setMaterialsDropdown] = useState<LookupOption[]>([]);
-    const [stylesDropdown, setStylesDropdown] = useState<LookupOption[]>([]);
-
-    const [industryDropdownOpen, setIndustryDropdownOpen] = useState(false);
-    const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false);
-    const [styleDropdownOpen, setStyleDropdownOpen] = useState(false);
-
-    const { control, watch, setValue, handleSubmit, formState: { errors }, } = useForm({
+    /* --------- Form --------- */
+    const { control, watch, setValue, handleSubmit, formState: { errors } } = useForm({
         resolver: zodResolver(locationPageFormSchema),
         defaultValues: {
             name: selectedData?.name || "",
@@ -162,8 +170,10 @@ const AddlocationPage = ({
             faqs: selectedData?.faqs || [],
             tags: selectedData?.tags || [],
             status: selectedData?.status || "DRAFT",
-        }
-    })
+            box: selectedData?.box || {},
+            relatedProducts: selectedData?.relatedProducts ?? [],
+        },
+    });
 
     const name = watch("name");
     const slug = watch("slug");
@@ -177,1157 +187,711 @@ const AddlocationPage = ({
             : descLength > 150
                 ? "text-amber-500"
                 : "text-emerald-600";
+
     const image = watch("image") ?? [];
     const faqs = watch("faqs") ?? [];
     const tags = watch("tags") ?? [];
+    const box = watch("box") ?? {};
+    const relatedProducts = watch("relatedProducts") ?? [];
 
-
-    /* ---------- Submit ---------- */
+    /* --------- Submit --------- */
     const onSubmit = async (values: any) => {
-        if (values.image.length < IMAGE_MIN) {
-            toast.error(`Please add at least ${IMAGE_MIN} image`);
-            return;
-        }
-        if (values.image.length > IMAGE_MAX) {
-            toast.error(`You can only have up to ${IMAGE_MAX} images`);
-            return;
-        }
-        if (!companyMember?.id) {
-            toast.error(
-                "Unable to identify the current user. Please refresh and try again."
-            );
-            return;
-        }
-
+        if (values.image.length < IMAGE_MIN) { toast.error(`Please add at least ${IMAGE_MIN} image`); return; }
+        if (values.image.length > IMAGE_MAX) { toast.error(`You can only have up to ${IMAGE_MAX} images`); return; }
+        if (!companyMember?.id) { toast.error("Unable to identify the current user."); return; }
 
         const clean = removeTypename(values);
-        console.log("Submitting locationPage data:", clean);
-
         try {
             if (isEditMode && selectedData?.id) {
-                const result = await updatelocationPage({
-                    variables: { id: selectedData.id, input: clean },
-                });
-
-                console.log("Update locationPage result:", result);
-                if (result.data?.updatelocationPage?.success) {
-                    toast.success(
-                        result.data.updatelocationPage.message ||
-                        "locationPage updated"
-                    );
-                    refetch?.();
-                    onCancel();
-                } else {
-                    toast.error(
-                        result.data?.updatelocationPage?.message ||
-                        "Update failed"
-                    );
-                }
+                const result = await updatelocationPage({ variables: { id: selectedData.id, input: clean } });
+                console.log({ result: result })
+                if (result.data?.updateLocationPage?.success) {
+                    toast.success(result.data.updateLocationPage.message || "Location page updated");
+                    refetch?.(); onCancel();
+                } else toast.error(result.data?.updateLocationPage?.message || "Update failed");
             } else {
-                const result = await createlocationPage({
-                    variables: { input: clean },
-                });
-                if (result.data?.createlocationPage?.success) {
-                    toast.success(
-                        result.data.createlocationPage.message ||
-                        "locationPage created"
-                    );
-                    refetch?.();
-                    onCancel();
-                } else {
-                    toast.error(
-                        result.data?.createlocationPage?.message ||
-                        "Creation failed"
-                    );
-                }
+                const result = await createlocationPage({ variables: { input: clean } });
+                if (result.data?.createLocationPage?.success) {
+                    toast.success(result.data.createLocationPage.message || "Location page created");
+                    refetch?.(); onCancel();
+                } else toast.error(result.data?.createLocationPage?.message || "Creation failed");
             }
         } catch (error: any) {
-            toast.error(
-                error?.message || "Operation failed. Please try again."
-            );
+            toast.error(error?.message || "Operation failed. Please try again.");
         }
     };
 
-    const [
-        checkSlug,
-        { loading: checkingSlug, data: slugData, error: slugError },
-    ] = useLazyQuery<any>(CHECK_LOCATION_PAGES_SLUG_UNIQUE, { fetchPolicy: "network-only" });
-    const [
-        checkH1Tag,
-        { loading: checkingH1Tag, data: h1TagData, error: h1TagError },
-    ] = useLazyQuery<any>(CHECK_LOCATION_PAGES_H1_TAG_UNIQUE, { fetchPolicy: "network-only" });
-    const [
-        checkMetaTitle,
-        { loading: checkingMetaTitle, data: metaTitleData, error: metaTitleError },
-    ] = useLazyQuery<any>(CHECK_LOCATION_PAGES_META_TITLE_UNIQUE, { fetchPolicy: "network-only" });
+    /* --------- Lazy uniqueness checks --------- */
+    const [checkSlug, { loading: checkingSlug, data: slugData, error: slugError }] =
+        useLazyQuery<any>(CHECK_LOCATION_PAGES_SLUG_UNIQUE, { fetchPolicy: "network-only" });
+    const [checkH1Tag, { loading: checkingH1Tag, data: h1TagData, error: h1TagError }] =
+        useLazyQuery<any>(CHECK_LOCATION_PAGES_H1_TAG_UNIQUE, { fetchPolicy: "network-only" });
+    const [checkMetaTitle, { loading: checkingMetaTitle, data: metaTitleData, error: metaTitleError }] =
+        useLazyQuery<any>(CHECK_LOCATION_PAGES_META_TITLE_UNIQUE, { fetchPolicy: "network-only" });
 
-    const { data: industriesData, error: industriesError } = useQuery<any>(GET_INDUSTRIES, { fetchPolicy: "network-only" });
-    const { data: materialsData, error: materialsError } = useQuery<any>(GET_MATERIALS, { fetchPolicy: "network-only" });
-    const { data: stylesData, error: stylesError } = useQuery<any>(GET_STYLES, { fetchPolicy: "network-only" });
+    /* --------- Related search --------- */
+    const [getRelatedProducts] = useLazyQuery<any>(SEARCH_PRODUCTS, {
+        fetchPolicy: "network-only",
+    });
+    // const { data: initialRelatedData } = useQuery<any>(SEARCH_LOCATION_PAGES_FOR_RELATED, {
+    //     variables: { search: undefined },
+    //     fetchPolicy: "cache-first",
+    // });
 
     useEffect(() => {
-        if (slugData?.checklocationPageSlugUnique) {
-            setSlugCheck(
-                slugData.checklocationPageSlugUnique.isUnique
-                    ? "✓ Slug is available"
-                    : "✗ Slug is already taken"
-            );
-        }
+        if (slugData?.checkLocationPageSlugUnique)
+            setSlugCheck(slugData.checkLocationPageSlugUnique.isUnique ? "✓ Slug is available" : "✗ Slug is already taken");
         if (slugError) toast.error("Failed to check slug availability");
     }, [slugData, slugError]);
 
     useEffect(() => {
-        if (h1TagData?.checklocationPageH1TagUnique) {
-            setH1TagCheck(
-                h1TagData.checklocationPageH1TagUnique.isUnique
-                    ? "✓ H1 Tag is available"
-                    : "✗ H1 Tag is already taken"
-            );
-        }
-        if (h1TagError) toast.error("Failed to check H1 Tag availability");
+        if (h1TagData?.checkLocationPageH1TagUnique)
+            setH1TagCheck(h1TagData.checkLocationPageH1TagUnique.isUnique ? "✓ H1 Tag is available" : "✗ H1 Tag is already taken");
+        if (h1TagError) toast.error("Failed to check H1 Tag");
     }, [h1TagData, h1TagError]);
 
     useEffect(() => {
-        if (metaTitleData?.checklocationPageMetaTitleUnique) {
-            setMetaTitleCheck(
-                metaTitleData.checklocationPageMetaTitleUnique.isUnique
-                    ? "✓ Meta Title is available"
-                    : "✗ Meta Title is already taken"
-            );
-        }
-        if (metaTitleError)
-            toast.error("Failed to check Meta Title availability");
+        if (metaTitleData?.checkLocationPageMetaTitleUnique)
+            setMetaTitleCheck(metaTitleData.checkLocationPageMetaTitleUnique.isUnique ? "✓ Meta Title is available" : "✗ Meta Title is already taken");
+        if (metaTitleError) toast.error("Failed to check Meta Title");
     }, [metaTitleData, metaTitleError]);
 
+    /* --------- Mutations --------- */
     const [createlocationPage, { loading: createLoading }] = useMutation<any>(CREATE_LOCATION_PAGES);
     const [updatelocationPage, { loading: updateLoading }] = useMutation<any>(UPDATE_LOCATION_PAGES);
     const isSubmitting = createLoading || updateLoading;
 
-    useEffect(() => {
-        if (industriesData?.findAllIndustries)
-            setIndustriesDropdown(industriesData.findAllIndustries);
-        if (industriesError) toast.error("Failed to load industries");
-    }, [industriesData, industriesError]);
-
-    useEffect(() => {
-        if (materialsData?.findAllMaterials)
-            setMaterialsDropdown(materialsData.findAllMaterials);
-        if (materialsError) toast.error("Failed to load materials");
-    }, [materialsData, materialsError]);
-
-    useEffect(() => {
-        if (stylesData?.findAllStyles)
-            setStylesDropdown(stylesData.findAllStyles);
-        if (stylesError) toast.error("Failed to load styles");
-    }, [stylesData, stylesError]);
-
-    useEffect(() => {
-        const handleClickOutside = () => {
-            setIndustryDropdownOpen(false);
-            setMaterialDropdownOpen(false);
-            setStyleDropdownOpen(false);
-        };
-        document.addEventListener("click", handleClickOutside);
-        return () => document.removeEventListener("click", handleClickOutside);
-    }, []);
-
-    const FieldErrorMsg = ({ message }: { message?: string }) => {
-        if (!message) return null;
-        return (
-            <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-rose-600">
-                <FiXCircle className="size-3.5 shrink-0" />
-                {message}
-            </p>
-        )
-    };
-
     const UniquenessResult = ({ status }: { status: string }) =>
         status ? (
-            <p
-                className={`mt-1.5 flex items-center gap-1.5 text-xs font-medium ${status.startsWith("✓") ? "text-emerald-600" : "text-rose-600"}`}
-            >
-                {status.startsWith("✓") ? (
-                    <FiCheckCircle className="size-3.5 shrink-0" />
-                ) : (
-                    <FiXCircle className="size-3.5 shrink-0" />
-                )}
+            <p className={`mt-1.5 flex items-center gap-1.5 text-xs font-medium ${status.startsWith("✓") ? "text-emerald-600" : "text-rose-600"}`}>
+                {status.startsWith("✓") ? <FiCheckCircle className="size-3.5 shrink-0" /> : <FiXCircle className="size-3.5 shrink-0" />}
                 {status.replace(/^[✓✗]\s*/, "")}
             </p>
         ) : null;
 
-    const checkSlugUnique = (slug: string) => {
-        if (!slug?.trim()) {
-            toast.error("Please enter a slug");
-            return;
-        }
-        setSlugCheck("");
-        checkSlug({
-            variables: { slug, excludeId: isEditMode ? selectedData?.id : undefined },
-        });
-    };
+    const checkSlugUnique = (v: string) => { if (!v?.trim()) return toast.error("Please enter a slug"); setSlugCheck(""); checkSlug({ variables: { slug: v, excludeId: isEditMode ? selectedData?.id : undefined } }); };
+    const checkH1TagUnique = (v: string) => { if (!v?.trim()) return toast.error("Please enter an H1 tag"); setH1TagCheck(""); checkH1Tag({ variables: { h1Tag: v, excludeId: isEditMode ? selectedData?.id : undefined } }); };
+    const checkMetaTitleUnique = (v: string) => { if (!v?.trim()) return toast.error("Please enter a meta title"); setMetaTitleCheck(""); checkMetaTitle({ variables: { metaTitle: v, excludeId: isEditMode ? selectedData?.id : undefined } }); };
 
-    const checkH1TagUnique = (h1Tag: string) => {
-        if (!h1Tag?.trim()) {
-            toast.error("Please enter an H1 tag");
-            return;
-        }
-        setH1TagCheck("");
-        checkH1Tag({
-            variables: { h1Tag, excludeId: isEditMode ? selectedData?.id : undefined },
-        });
-    };
-
-    const checkMetaTitleUnique = (metaTitle: string) => {
-        if (!metaTitle?.trim()) {
-            toast.error("Please enter a meta title");
-            return;
-        }
-        setMetaTitleCheck("");
-        checkMetaTitle({
-            variables: { metaTitle, excludeId: isEditMode ? selectedData?.id : undefined },
-        });
-    };
-
-    const startEditAlt = (index: number) => {
-        setEditingIndex(index);
-        setAltInput(image?.[index]?.alt ?? "");
-    };
-
-    const cancelEdit = () => {
-        setEditingIndex(null);
-        setAltInput("");
-    };
-
-    const saveAlt = (index: number) => {
-        const current = image ?? [];
-        const next = current.map((img, i) =>
-            i === index ? { ...img, alt: altInput.trim() } : img
-        );
+    /* --------- Gallery image handlers --------- */
+    const startEditAlt = (i: number) => { setEditingIndex(i); setAltInput(image?.[i]?.alt ?? ""); };
+    const cancelEdit = () => { setEditingIndex(null); setAltInput(""); };
+    const saveAlt = (i: number) => {
+        const next = (image ?? []).map((img, idx) => idx === i ? { ...img, alt: altInput.trim() } : img);
         setValue("image", next, { shouldValidate: true, shouldDirty: true });
-        setEditingIndex(null);
-        setAltInput("");
+        setEditingIndex(null); setAltInput("");
     };
-
-    const handleRemove = (index: number) => {
-        const current = image ?? [];
-        setValue(
-            "image",
-            current.filter((_, i) => i !== index),
-            { shouldValidate: true, shouldDirty: true }
-        );
+    const handleRemove = (i: number) => {
+        setValue("image", (image ?? []).filter((_, idx) => idx !== i), { shouldValidate: true, shouldDirty: true });
     };
-
     const handleGalleryClose = () => setShowGallery(false);
     const handleGallerySelect = (selected: any[]) => {
-        if (!selected?.length) {
-            setShowGallery(false);
-            return;
-        }
-        const current = image ?? [];
-        const remainingSlots = IMAGE_MAX - current.length;
-        if (remainingSlots <= 0) {
-            toast.error(`You can add up to ${IMAGE_MAX} images`);
-            setShowGallery(false);
-            return;
-        }
-        const newImages = selected
-            .slice(0, remainingSlots)
-            .map((img) => ({ url: img.url, alt: img.alt || "" }));
-
-        setValue("image", [...current, ...newImages], {
-            shouldValidate: true,
-            shouldDirty: true,
-        });
-
+        if (!selected?.length) { setShowGallery(false); return; }
+        const remaining = IMAGE_MAX - (image?.length ?? 0);
+        if (remaining <= 0) { toast.error(`You can add up to ${IMAGE_MAX} images`); setShowGallery(false); return; }
+        const newImages = selected.slice(0, remaining).map((img) => ({ url: img.url, alt: img.alt || "" }));
+        setValue("image", [...(image ?? []), ...newImages], { shouldValidate: true, shouldDirty: true });
         setShowGallery(false);
     };
 
     const validation = {
         total: image.length,
         withAlt: image.filter((img) => img.alt.trim().length > 0).length,
-        min: IMAGE_MIN,
-        max: IMAGE_MAX,
+        min: IMAGE_MIN, max: IMAGE_MAX,
     };
-
     const checks = [
-        { label: `Minimum ${validation.min} image`, ok: validation.total >= validation.min },
-        { label: `Maximum ${validation.max} images`, ok: validation.total <= validation.max },
-        { label: "At least 1 image has alt text", ok: validation.withAlt >= 1 },
+        { label: `Min ${validation.min} image`, ok: validation.total >= validation.min },
+        { label: `Max ${validation.max} images`, ok: validation.total <= validation.max },
+        { label: "Alt text added", ok: validation.withAlt >= 1 },
     ];
 
-    const handleFaqChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-    ) => {
+    /* --------- Box image picker --------- */
+    const handleBoxGallerySelect = (selected: any[]) => {
+        if (selected?.length) {
+            const first = selected[0];
+            setValue("box", { ...(box ?? {}), rightImage: { url: first.url, alt: first.alt || "" } }, { shouldValidate: true, shouldDirty: true });
+        }
+        setShowBoxGallery(false);
+    };
+
+    /* --------- FAQ handlers --------- */
+    const handleFaqChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setCurrentFaq((prev) => ({ ...prev, [name]: value }));
     };
-
     const addOrUpdateFaq = () => {
-        const question = currentFaq.question.trim();
-        const answer = currentFaq.answer.trim();
-
-        if (!question) {
-            toast.error("FAQ question is required");
-            return;
-        }
-        if (!answer) {
-            toast.error("FAQ answer is required");
-            return;
-        }
-
-        const current = faqs ?? [];
-
+        const q = currentFaq.question.trim(); const a = currentFaq.answer.trim();
+        if (!q) { toast.error("FAQ question is required"); return; }
+        if (!a) { toast.error("FAQ answer is required"); return; }
+        const cur = faqs ?? [];
         if (editingFaqIndex !== null) {
-            const next = current.map((f, i) =>
-                i === editingFaqIndex ? { question, answer } : f
-            );
-            setValue("faqs", next, { shouldValidate: true, shouldDirty: true });
+            setValue("faqs", cur.map((f, i) => i === editingFaqIndex ? { question: q, answer: a } : f), { shouldValidate: true, shouldDirty: true });
             toast.success("FAQ updated");
         } else {
-            setValue("faqs", [...current, { question, answer }], {
-                shouldValidate: true,
-                shouldDirty: true,
-            });
+            setValue("faqs", [...cur, { question: q, answer: a }], { shouldValidate: true, shouldDirty: true });
             toast.success("FAQ added");
         }
-
-        setCurrentFaq({ question: "", answer: "" });
-        setEditingFaqIndex(null);
+        setCurrentFaq({ question: "", answer: "" }); setEditingFaqIndex(null);
     };
+    const editFaq = (i: number) => { const f = faqs?.[i]; if (!f) return; setCurrentFaq({ question: f.question, answer: f.answer }); setEditingFaqIndex(i); };
+    const deleteFaq = (i: number) => { setValue("faqs", (faqs ?? []).filter((_, idx) => idx !== i), { shouldValidate: true, shouldDirty: true }); if (editingFaqIndex === i) { setEditingFaqIndex(null); setCurrentFaq({ question: "", answer: "" }); } };
+    const cancelEditFaq = () => { setEditingFaqIndex(null); setCurrentFaq({ question: "", answer: "" }); };
 
-    const editFaq = (index: number) => {
-        const faq = faqs?.[index];
-        if (!faq) return;
-        setCurrentFaq({ question: faq.question, answer: faq.answer });
-        setEditingFaqIndex(index);
-    };
+    /* --------- Tag handlers --------- */
+    const addTag = () => { const t = tagInput.trim(); if (t && !tags.includes(t)) setValue("tags", [...tags, t], { shouldValidate: true }); setTagInput(""); };
+    const removeTag = (t: string) => setValue("tags", tags.filter((x) => x !== t), { shouldValidate: true });
 
-    const deleteFaq = (index: number) => {
-        const current = faqs ?? [];
-        setValue(
-            "faqs",
-            current.filter((_, i) => i !== index),
-            { shouldValidate: true, shouldDirty: true }
-        );
-        if (editingFaqIndex === index) {
-            setEditingFaqIndex(null);
-            setCurrentFaq({ question: "", answer: "" });
+    /* -------- Related product async search -------- */
+    const mapProductToOption = (p: any) => ({
+        value: p.id,          // query now returns `id`
+        label: p.name,
+        slug: p.slug,
+        imageUrl: p.imageUrl[0],
+    });
+
+    const loadRelatedProductOptions = async (inputValue: string) => {
+        try {
+            const result = await getRelatedProducts({
+                variables: {
+                    search: inputValue || undefined,
+                },
+            });
+            // query returns a plain array
+            const list = result.data?.getRelatedProducts ?? [];
+            return list
+                .filter((p: any) => p.id !== selectedData?.id)
+                .map(mapProductToOption);
+        } catch (err: any) {
+            if (err?.name === "AbortError" || err?.message?.includes("aborted")) {
+                return [];
+            }
+            console.error("Failed to load products", err);
+            return [];
         }
     };
-
-    const cancelEditFaq = () => {
-        setEditingFaqIndex(null);
-        setCurrentFaq({ question: "", answer: "" });
-    };
-
-    const addTag = () => {
-        const trimmed = tagInput.trim();
-        if (trimmed && !tags.includes(trimmed)) {
-            setValue("tags", [...tags, trimmed], { shouldValidate: true });
-        }
-        setTagInput("");
-    };
-
-    const removeTag = (tag: string) => {
-        setValue(
-            "tags",
-            tags.filter((t) => t !== tag),
-            { shouldValidate: true }
-        );
-    };
-
 
     /* ============================================================
-     * Reusable UI pieces for consistent look across dropdowns
+     * Tab layout
      * ============================================================ */
-    const dropdownTriggerClass =
-        "w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm text-slate-700 shadow-xs text-left flex justify-between items-center transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary";
+    const [activeTab, setActiveTab] = useState<"basic" | "content" | "media" | "details" | "related">("basic");
 
-    const renderMultiSelect = (
-        label: string,
-        options: LookupOption[],
-        selectedIds: string[],
-        isOpen: boolean,
-        onToggleOpen: () => void,
-        onToggleItem: (id: string) => void,
-        chipClass: string,
-        removeBtnClass: string
-    ) => (
-        <div className="relative">
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                {label}
-            </label>
-            <button
-                type="button"
-                className={dropdownTriggerClass}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleOpen();
-                }}
-                aria-haspopup="listbox"
-                aria-expanded={isOpen}
-            >
-                <span className="truncate">
-                    {selectedIds.length > 0
-                        ? `${selectedIds.length} ${label.toLowerCase()}(s) selected`
-                        : `Select ${label.toLowerCase()}`}
-                </span>
-                {isOpen ? (
-                    <FiChevronUp className="size-4 shrink-0 text-slate-500" />
-                ) : (
-                    <FiChevronDown className="size-4 shrink-0 text-slate-500" />
-                )}
-            </button>
-
-            {isOpen && (
-                <div
-                    className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1"
-                    onClick={(e) => e.stopPropagation()}
-                    role="listbox"
-                >
-                    {options.length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-slate-400">
-                            No {label.toLowerCase()} found
-                        </div>
-                    ) : (
-                        options.map((opt) => {
-                            const checked = selectedIds.includes(opt.id);
-                            return (
-                                <label
-                                    key={opt.id}
-                                    className={`flex items-center px-3 py-2 cursor-pointer text-sm transition ${checked ? "bg-slate-50" : "hover:bg-slate-50"}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={() => onToggleItem(opt.id)}
-                                        className="mr-2 size-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                    />
-                                    <span className={checked ? "font-medium text-slate-800" : "text-slate-600"}>
-                                        {opt.name}
-                                    </span>
-                                </label>
-                            );
-                        })
-                    )}
-                </div>
-            )}
-
-            {selectedIds.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                    {selectedIds.map((id) => {
-                        const opt = options.find((o) => o.id === id);
-                        if (!opt) return null;
-                        return (
-                            <span
-                                key={id}
-                                className={`inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-xs font-medium ${chipClass}`}
-                            >
-                                {opt.name}
-                                <button
-                                    type="button"
-                                    onClick={() => onToggleItem(id)}
-                                    className={`rounded-full p-0.5 transition ${removeBtnClass}`}
-                                    aria-label={`Remove ${opt.name}`}
-                                >
-                                    <FiX className="size-3" />
-                                </button>
-                            </span>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
-    );
+    const tabs: { id: typeof activeTab; label: string; icon: React.ReactNode }[] = [
+        { id: "basic", label: "Basics", icon: <Box className="size-4" /> },
+        { id: "content", label: "Content & SEO", icon: <FiFileText className="size-4" /> },
+        { id: "media", label: "Media", icon: <FiImage className="size-4" /> },
+        { id: "details", label: "Details & Settings", icon: <FiGrid className="size-4" /> },
+        { id: "related", label: "Related Pages", icon: <PackageSearch className="size-4" /> },
+    ];
 
     return (
         <>
             <Dialog open={true} onOpenChange={() => onCancel()}>
-                <DialogContent className="max-w-5xl! max-h-[90vh] p-0 overflow-hidden">
-                    {/* ---------------- Header ---------------- */}
-                    <DialogHeader className="px-6 py-4 border-b border-border">
-                        <div className="flex items-center gap-4">
-                            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-md shadow-primary/20">
-                                <Box size={22} strokeWidth={1.8} />
+                <DialogContent className="max-w-6xl! p-0 overflow-hidden bg-slate-50">
+                    {/* Header */}
+                    <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-white">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-md shadow-primary/30">
+                                    <Box size={20} strokeWidth={1.8} />
+                                </div>
+                                <div>
+                                    <DialogTitle className="text-lg font-bold text-slate-900">
+                                        {isEditMode ? "Edit Location Page" : "Add New Location Page"}
+                                    </DialogTitle>
+                                    <DialogDescription className="text-xs text-slate-500">
+                                        {isEditMode ? "Update location page details and metadata." : "Fill in the sections below. Required fields marked with *"}
+                                    </DialogDescription>
+                                </div>
                             </div>
-                            <div>
-                                <DialogTitle className="text-xl font-bold">
-                                    {isEditMode ? "Edit locationPage" : "Add New locationPage"}
-                                </DialogTitle>
-                                <DialogDescription className="text-sm text-slate-500">
-                                    {isEditMode ? "Update locationPage details" : "Create a new locationPage"}
-                                </DialogDescription>
-                            </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex items-center gap-1 mt-4 -mb-4 overflow-x-auto">
+                            {tabs.map((t) => {
+                                const active = activeTab === t.id;
+                                return (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => setActiveTab(t.id)}
+                                        className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${active ? "border-primary text-primary/90" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+                                    >
+                                        {t.icon} {t.label}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </DialogHeader>
 
-                    <form onSubmit={handleSubmit(onSubmit)} className=" flex flex-col h-[60vh] overflow-auto ">
-                        {/* ScrollArea height increased from 50vh → 60vh for better UX */}
-                        <ScrollArea className="flex flex-col space-y-6 px-6 pt-4 pb-20">
+                    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col">
+                        <ScrollArea className="h-[calc(90vh-220px)]">
+                            <div className="px-6 py-5 space-y-5">
 
-                            {/* ---------------- locationPage Details ---------------- */}
-                            <CardWithTitleAndIcon
-                                title="locationPage Details"
-                                description="Provide comprehensive information about your locationPage."
-                                icon={<Box size={17} />}
-                            >
-                                <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2 bg-slate-50/80 p-6 rounded-xl m-0.5 ring-1 ring-slate-200">
-                                    {/* Name */}
-                                    <div>
-                                        <FieldLabel htmlFor="locationPage-name">
-                                            locationPage name <span className="text-rose-500">*</span>
-                                        </FieldLabel>
-                                        <div className="mt-1">
-                                            <Controller
-                                                name="name"
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <Input
-                                                        id="locationPage-name"
-                                                        placeholder="e.g., Handwoven Wool Throw"
-                                                        {...field}
-                                                        className="bg-white"
-                                                        onChange={(e) => {
-                                                            field.onChange(e);
-                                                            if (!isSlugManual) {
-                                                                setValue("slug", generateSlug(e.target.value), {
-                                                                    shouldValidate: true,
-                                                                    shouldDirty: true,
-                                                                });
-                                                            }
-                                                        }}
-                                                    />
-                                                )}
-                                            />
-                                        </div>
-                                        <FieldErrorMsg message={errors.name?.message as string} />
-                                    </div>
-
-                                    {/* Slug */}
-                                    <div>
-                                        <FieldLabel htmlFor="locationPage-slug">
-                                            Slug <span className="text-rose-500">*</span>
-                                        </FieldLabel>
-                                        <div className="flex gap-2 mt-1">
-                                            <Controller
-                                                name="slug"
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <Input
-                                                        id="locationPage-slug"
-                                                        placeholder="locationPage-slug"
-                                                        {...field}
-                                                        onFocus={() => setIsSlugManual(true)}
-                                                        onBlur={() => {
-                                                            if (
-                                                                field.value === generateSlug(name ?? "")
-                                                            ) {
-                                                                setIsSlugManual(false);
-                                                            }
-                                                        }}
-                                                    />
-                                                )}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => checkSlugUnique(slug)}
-                                                disabled={checkingSlug || !slug?.trim()}
-                                                className="shrink-0 bg-blue-600 text-white hover:text-white hover:bg-blue-700 border-blue-600"
-                                            >
-                                                {checkingSlug ? (
-                                                    <LoaderCircle className="size-4 animate-spin" />
-                                                ) : "Check"}
-                                            </Button>
-                                        </div>
-                                        <UniquenessResult status={slugCheck} />
-                                        <FieldErrorMsg message={errors.slug?.message as string} />
-                                    </div>
-
-                                    {/* Short Description */}
-                                    <div className="md:col-span-2">
-                                        <FieldLabel htmlFor="locationPage-short-desc">
-                                            Short description
-                                        </FieldLabel>
-                                        <div className="mt-1">
-                                            <Controller
-                                                name="shortDescription"
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <Textarea
-                                                        id="locationPage-short-desc"
-                                                        placeholder="A one- or two-line summary shown on listing and category pages"
-                                                        rows={3}
-                                                        {...field}
-                                                    />
-                                                )}
-                                            />
-                                        </div>
-                                        <FieldErrorMsg message={errors.shortDescription?.message as string} />
-                                    </div>
-                                </div>
-                            </CardWithTitleAndIcon>
-
-                            {/* ---------------- SEO ---------------- */}
-                            <CardWithTitleAndIcon
-                                title="Seo & Metadata"
-                                description="Optimize your locationPage for search engines with relevant metadata."
-                                icon={<Search size={17} />}
-                            >
-                                <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2 bg-slate-50/80 p-6 rounded-xl m-0.5 ring-1 ring-slate-200">
-                                    {/* H1 */}
-                                    <div>
-                                        <FieldLabel htmlFor="locationPage-h1">
-                                            H1 tag <span className="text-rose-500">*</span>
-                                        </FieldLabel>
-                                        <div className="flex gap-2 mt-1">
-                                            <Controller
-                                                name="h1Tag"
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <Input
-                                                        id="locationPage-h1"
-                                                        placeholder="e.g., Premium Wool Throw Blanket"
-                                                        {...field}
-                                                        onFocus={() => setIsH1Manual(true)}
-                                                        onBlur={() => {
-                                                            if (field.value === (name ?? "")) {
-                                                                setIsH1Manual(false);
-                                                            }
-                                                        }}
-                                                    />
-                                                )}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => checkH1TagUnique(h1Tag)}
-                                                disabled={checkingH1Tag || !h1Tag?.trim()}
-                                                className="shrink-0 bg-blue-600 text-white hover:bg-blue-700 hover:text-white border-blue-600"
-                                            >
-                                                {checkingH1Tag ? (
-                                                    <LoaderCircle className="size-4 animate-spin" />
-                                                ) : "Check"}
-                                            </Button>
-                                        </div>
-                                        <UniquenessResult status={h1TagCheck} />
-                                        <FieldErrorMsg message={errors.h1Tag?.message as string} />
-                                    </div>
-
-                                    {/* Meta title */}
-                                    <div>
-                                        <FieldLabel htmlFor="meta-title">
-                                            Meta title <span className="text-rose-500">*</span>
-                                        </FieldLabel>
-                                        <div className="flex gap-2 mt-1">
-                                            <Controller
-                                                name="metaTitle"
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <Input
-                                                        id="meta-title"
-                                                        placeholder="e.g., Premium Wool Throw Blanket"
-                                                        {...field}
-                                                        onFocus={() => setIsMetaTitleManual(true)}
-                                                        onBlur={() => {
-                                                            if (field.value === (name ?? "")) {
-                                                                setIsMetaTitleManual(false);
-                                                            }
-                                                        }}
-                                                    />
-                                                )}
-                                            />
-                                            <Button
-                                                type="button"
-                                                onClick={() => checkMetaTitleUnique(metaTitle)}
-                                                disabled={checkingMetaTitle || !metaTitle?.trim()}
-                                                className="shrink-0 bg-blue-600 text-white hover:bg-blue-700 hover:text-white"
-                                            >
-                                                {checkingMetaTitle ? (
-                                                    <LoaderCircle className="size-4 animate-spin" />
-                                                ) : "Check"}
-                                            </Button>
-                                        </div>
-                                        <UniquenessResult status={metaTitleCheck} />
-                                        <FieldErrorMsg message={errors.metaTitle?.message as string} />
-                                    </div>
-
-                                    {/* Meta Description */}
-                                    <div className="md:col-span-2">
-                                        <div className="mb-1.5 flex items-baseline justify-between">
-                                            <FieldLabel htmlFor="locationPage-meta-desc">
-                                                Meta description
-                                            </FieldLabel>
-                                            <span className={`text-xs font-medium ${descTone}`}>
-                                                {descLength}/{META_DESCRIPTION_MAX}
-                                            </span>
-                                        </div>
-                                        <Controller
-                                            name="metaDescription"
-                                            control={control}
-                                            render={({ field }) => (
-                                                <Textarea
-                                                    id="locationPage-meta-desc"
-                                                    placeholder="Summarize the locationPage for search engines, ideally 150–160 characters"
-                                                    rows={3}
-                                                    {...field}
-                                                />
-                                            )}
-                                        />
-                                        <FieldErrorMsg message={errors.metaDescription?.message as string} />
-                                    </div>
-                                </div>
-                            </CardWithTitleAndIcon>
-
-                            {/* ---------------- Content ---------------- */}
-                            <CardWithTitleAndIcon
-                                title="Content"
-                                description="The full description and specification shown on the locationPage page."
-                                icon={<FiFileText className="size-4.5" />}
-                            >
-                                <div className="space-y-6 p-6 bg-slate-50/80 rounded-xl ring-1 ring-slate-200 m-0.5">
-                                    <div>
-                                        <FieldLabel>Content</FieldLabel>
-                                        <Controller
-                                            name="content"
-                                            control={control}
-                                            render={({ field }) => (
-                                                <div className="mt-1 overflow-hidden rounded-lg border border-slate-200">
-                                                    <TiptopTextEditor
-                                                        height="h-40"
-                                                        initialValue={field.value}
-                                                        onChange={(content: string) =>
-                                                            field.onChange(content)
-                                                        }
-                                                    />
+                                {/* ---------- BASIC ---------- */}
+                                {activeTab === "basic" && (
+                                    <div className="space-y-5">
+                                        <Section>
+                                            <SectionHeader title="Page Identity" desc="The name, URL slug, and short summary for this location page." icon={<Box className="size-4" />} />
+                                            <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
+                                                <div>
+                                                    <FieldLabel htmlFor="lp-name">Location page name <span className="text-rose-500">*</span></FieldLabel>
+                                                    <Controller name="name" control={control} render={({ field }) => (
+                                                        <Input id="lp-name" placeholder="e.g., Custom Boxes in London" {...field} className="mt-1"
+                                                            onChange={(e) => {
+                                                                field.onChange(e);
+                                                                if (!isSlugManual) setValue("slug", generateSlug(e.target.value), { shouldValidate: true, shouldDirty: true });
+                                                            }} />
+                                                    )} />
+                                                    <FieldErrorMsg message={errors.name?.message as string} />
                                                 </div>
-                                            )}
-                                        />
-                                    </div>
-                                    <div>
-                                        <FieldLabel>Specifications</FieldLabel>
-                                        <Controller
-                                            name="specification"
-                                            control={control}
-                                            render={({ field }) => (
-                                                <div className="mt-1 overflow-hidden rounded-lg border border-slate-200">
-                                                    <TiptopTextEditor
-                                                        height="h-40"
-                                                        initialValue={field.value}
-                                                        onChange={(content: string) =>
-                                                            field.onChange(content)
-                                                        }
-                                                    />
+                                                <div>
+                                                    <FieldLabel htmlFor="lp-slug">Slug <span className="text-rose-500">*</span></FieldLabel>
+                                                    <div className="flex gap-2 mt-1">
+                                                        <Controller name="slug" control={control} render={({ field }) => (
+                                                            <Input id="lp-slug" placeholder="location-page-slug" {...field}
+                                                                onFocus={() => setIsSlugManual(true)}
+                                                                onBlur={() => { if (field.value === generateSlug(name ?? "")) setIsSlugManual(false); }} />
+                                                        )} />
+                                                        <Button type="button" size="sm" onClick={() => checkSlugUnique(slug)} disabled={checkingSlug || !slug?.trim()}
+                                                            className="shrink-0 bg-primary/90 text-white hover:bg-primary">
+                                                            {checkingSlug ? <LoaderCircle className="size-4 animate-spin" /> : "Check"}
+                                                        </Button>
+                                                    </div>
+                                                    <UniquenessResult status={slugCheck} />
+                                                    <FieldErrorMsg message={errors.slug?.message as string} />
                                                 </div>
-                                            )}
-                                        />
-                                    </div>
-                                </div>
-                            </CardWithTitleAndIcon>
+                                                <div className="md:col-span-2">
+                                                    <FieldLabel htmlFor="lp-short-desc">Short description</FieldLabel>
+                                                    <Controller name="shortDescription" control={control} render={({ field }) => (
+                                                        <Textarea id="lp-short-desc" rows={2} placeholder="A concise summary for listing and category pages" className="mt-1" {...field} />
+                                                    )} />
+                                                    <Hint>Appears in listings. Keep it under 120 characters.</Hint>
+                                                </div>
+                                            </div>
+                                        </Section>
 
-                            {/* ---------------- Images ---------------- */}
-                            <CardWithTitleAndIcon
-                                title="Images"
-                                description="Add locationPage photos and describe them for accessibility and SEO."
-                                icon={<FiImage className="size-4.5" />}
-                            >
-                                <div className="space-y-4 bg-slate-50/80 p-6 rounded-xl ring-1 ring-slate-200 m-0.5">
-                                    <div className="flex flex-wrap gap-4">
-                                        {image.map((img, index) => (
-                                            <div
-                                                key={`${img.url}-${index}`}
-                                                className="group relative size-48 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm transition-shadow hover:shadow-md"
-                                            >
-                                                <Image
-                                                    src={img.url}
-                                                    alt={img.alt || `locationPage ${index + 1}`}
-                                                    fill
-                                                    className="object-cover"
-                                                />
-                                                {editingIndex === index ? (
-                                                    <div className="absolute inset-0 flex flex-col bg-slate-900/90 p-2">
-                                                        <Textarea
-                                                            value={altInput}
-                                                            onChange={(e) =>
-                                                                setAltInput(e.target.value)
-                                                            }
-                                                            placeholder="Describe this image"
-                                                            className="flex-1 resize-none rounded border border-slate-500 bg-transparent p-1.5 text-xs text-white placeholder:text-slate-400"
-                                                            maxLength={ALT_TEXT_MAX}
-                                                            autoFocus
-                                                        />
-                                                        <div className="mt-1 flex items-center justify-between">
-                                                            <span className="text-[10px] text-slate-300">
-                                                                {altInput.length}/{ALT_TEXT_MAX}
-                                                            </span>
-                                                            <div className="flex gap-1">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => saveAlt(index)}
-                                                                    className="rounded bg-emerald-500 px-2 py-1 text-[11px] font-medium text-white transition hover:bg-emerald-600"
-                                                                >
-                                                                    Save
+                                        <Section>
+                                            <SectionHeader title="Search Engine Optimization" desc="Help people find your location page on search engines." icon={<Search className="size-4" />} />
+                                            <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
+                                                <div>
+                                                    <FieldLabel htmlFor="lp-h1">H1 tag <span className="text-rose-500">*</span></FieldLabel>
+                                                    <div className="flex gap-2 mt-1">
+                                                        <Controller name="h1Tag" control={control} render={({ field }) => (
+                                                            <Input id="lp-h1" placeholder="e.g., Premium Custom Boxes in London" {...field} />
+                                                        )} />
+                                                        <Button type="button" size="sm" onClick={() => checkH1TagUnique(h1Tag)} disabled={checkingH1Tag || !h1Tag?.trim()}
+                                                            className="shrink-0 bg-primary/90 text-white hover:bg-primary">
+                                                            {checkingH1Tag ? <LoaderCircle className="size-4 animate-spin" /> : "Check"}
+                                                        </Button>
+                                                    </div>
+                                                    <UniquenessResult status={h1TagCheck} />
+                                                    <FieldErrorMsg message={errors.h1Tag?.message as string} />
+                                                </div>
+                                                <div>
+                                                    <FieldLabel htmlFor="lp-meta-title">Meta title <span className="text-rose-500">*</span></FieldLabel>
+                                                    <div className="flex gap-2 mt-1">
+                                                        <Controller name="metaTitle" control={control} render={({ field }) => (
+                                                            <Input id="lp-meta-title" placeholder="e.g., Premium Custom Boxes in London" {...field} />
+                                                        )} />
+                                                        <Button type="button" size="sm" onClick={() => checkMetaTitleUnique(metaTitle)} disabled={checkingMetaTitle || !metaTitle?.trim()}
+                                                            className="shrink-0 bg-primary/90 text-white hover:bg-primary">
+                                                            {checkingMetaTitle ? <LoaderCircle className="size-4 animate-spin" /> : "Check"}
+                                                        </Button>
+                                                    </div>
+                                                    <UniquenessResult status={metaTitleCheck} />
+                                                    <FieldErrorMsg message={errors.metaTitle?.message as string} />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <div className="mb-1.5 flex items-baseline justify-between">
+                                                        <FieldLabel htmlFor="lp-meta-desc">Meta description</FieldLabel>
+                                                        <span className={`text-xs font-medium ${descTone}`}>{descLength}/{META_DESCRIPTION_MAX}</span>
+                                                    </div>
+                                                    <Controller name="metaDescription" control={control} render={({ field }) => (
+                                                        <Textarea id="lp-meta-desc" rows={3} placeholder="Summarize the location page for search engines, ideally 150–160 characters" {...field} />
+                                                    )} />
+                                                    <Hint>Appears in Google search results under the title.</Hint>
+                                                    <FieldErrorMsg message={errors.metaDescription?.message as string} />
+                                                </div>
+                                            </div>
+                                        </Section>
+                                    </div>
+                                )}
+
+                                {/* ---------- CONTENT ---------- */}
+                                {activeTab === "content" && (
+                                    <div className="space-y-5">
+                                        <Section>
+                                            <SectionHeader title="Content" desc="The main rich-text content shown on the location page." icon={<FiFileText className="size-4" />} />
+                                            <Controller name="content" control={control} render={({ field }) => (
+                                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                                    <TiptopTextEditor height="h-96" initialValue={field.value} onChange={field.onChange} />
+                                                </div>
+                                            )} />
+                                        </Section>
+                                        <Section>
+                                            <SectionHeader title="Specifications" desc="Technical details, sizes, dimensions, etc." icon={<FiGrid className="size-4" />} />
+                                            <Controller name="specification" control={control} render={({ field }) => (
+                                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                                    <TiptopTextEditor height="h-96" initialValue={field.value} onChange={field.onChange} />
+                                                </div>
+                                            )} />
+                                        </Section>
+                                    </div>
+                                )}
+
+                                {/* ---------- MEDIA ---------- */}
+                                {activeTab === "media" && (
+                                    <Section>
+                                        <SectionHeader title="Page Images" desc="Upload up to 10 images. Add alt text for accessibility and SEO." icon={<FiImage className="size-4" />} />
+                                        <div className="flex flex-wrap gap-3">
+                                            {image.map((img, index) => (
+                                                <div key={`${img.url}-${index}`}
+                                                    className="group relative size-40 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm transition hover:shadow-md">
+                                                    <Image src={img.url} alt={img.alt || `Image ${index + 1}`} fill className="object-cover" />
+                                                    {editingIndex === index ? (
+                                                        <div className="absolute inset-0 flex flex-col bg-slate-900/90 p-2">
+                                                            <Textarea value={altInput} onChange={(e) => setAltInput(e.target.value)}
+                                                                placeholder="Describe this image"
+                                                                className="flex-1 resize-none rounded border border-slate-500 bg-transparent p-1.5 text-xs text-white placeholder:text-slate-400"
+                                                                maxLength={ALT_TEXT_MAX} autoFocus />
+                                                            <div className="mt-1 flex items-center justify-between">
+                                                                <span className="text-[10px] text-slate-300">{altInput.length}/{ALT_TEXT_MAX}</span>
+                                                                <div className="flex gap-1">
+                                                                    <button type="button" onClick={() => saveAlt(index)} className="rounded bg-emerald-500 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-600">Save</button>
+                                                                    <button type="button" onClick={cancelEdit} className="rounded bg-slate-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-slate-500">Cancel</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+                                                            <button type="button" onClick={() => handleRemove(index)}
+                                                                className="absolute right-1 top-1 rounded-full bg-rose-500 p-1.5 text-white opacity-0 shadow-md transition group-hover:opacity-100 hover:bg-rose-600" aria-label="Remove image">
+                                                                <FiX className="size-3" />
+                                                            </button>
+                                                            {img.alt ? (
+                                                                <button type="button" onClick={() => startEditAlt(index)}
+                                                                    className="absolute inset-x-0 bottom-0 truncate bg-black/60 p-1.5 text-left text-[11px] text-white hover:bg-black/75" title="Edit alt text">
+                                                                    {img.alt}
                                                                 </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={cancelEdit}
-                                                                    className="rounded bg-slate-600 px-2 py-1 text-[11px] font-medium text-white transition hover:bg-slate-500"
-                                                                >
-                                                                    Cancel
+                                                            ) : (
+                                                                <button type="button" onClick={() => startEditAlt(index)}
+                                                                    className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-medium text-white shadow-md hover:bg-amber-600">
+                                                                    <FiEdit2 className="size-3" /> Add alt text
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {(image?.length ?? 0) < IMAGE_MAX && (
+                                                <button type="button" onClick={() => setShowGallery(true)}
+                                                    className="flex size-40 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 transition hover:border-primary hover:bg-indigo-50 hover:text-primary/90">
+                                                    <FiUploadCloud className="size-7" />
+                                                    <span className="text-xs font-medium">Add image</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5">
+                                            {checks.map((c) => (
+                                                <span key={c.label} className={`flex items-center gap-1.5 text-xs font-medium ${c.ok ? "text-emerald-600" : "text-rose-600"}`}>
+                                                    {c.ok ? <FiCheckCircle className="size-3.5" /> : <FiXCircle className="size-3.5" />}
+                                                    {c.label}
+                                                </span>
+                                            ))}
+                                            <span className="ml-auto text-xs text-slate-400">{validation.total} image{validation.total !== 1 ? "s" : ""} added</span>
+                                        </div>
+                                        <FieldErrorMsg message={errors.image?.message as string} />
+                                    </Section>
+                                )}
+
+                                {/* ---------- DETAILS & SETTINGS ---------- */}
+                                {activeTab === "details" && (
+                                    <div className="space-y-5">
+                                        {/* Highlight Box */}
+                                        <Section>
+                                            <SectionHeader title="Highlight Box" desc="Optional callout box shown on the page with a title, content, and optional image." icon={<Box className="size-4" />} />
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div>
+                                                    <FieldLabel htmlFor="box-title">Box title</FieldLabel>
+                                                    <Controller name="box.boxTitle" control={control} render={({ field }) => (
+                                                        <Input id="box-title" placeholder="e.g., Why choose us?" {...field} value={field.value ?? ""} className="mt-1" />
+                                                    )} />
+                                                </div>
+                                                <div>
+                                                    <FieldLabel>Box image (right)</FieldLabel>
+                                                    <div className="mt-1 flex items-center gap-3">
+                                                        {box?.rightImage?.url ? (
+                                                            <div className="relative size-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                                                                <Image src={box.rightImage.url} alt={box.rightImage.alt || "Box image"} fill className="object-cover" />
+                                                                <button type="button"
+                                                                    onClick={() => setValue("box", { ...(box ?? {}), rightImage: undefined }, { shouldValidate: true, shouldDirty: true })}
+                                                                    className="absolute right-0.5 top-0.5 rounded-full bg-rose-500 p-1 text-white hover:bg-rose-600" aria-label="Remove image">
+                                                                    <FiX className="size-2.5" />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex size-16 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-slate-400">
+                                                                <ImageIcon className="size-5" />
+                                                            </div>
+                                                        )}
+                                                        <Button type="button" variant="outline" onClick={() => setShowBoxGallery(true)}>
+                                                            {box?.rightImage?.url ? "Change" : "Choose image"}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <FieldLabel htmlFor="box-content">Box content</FieldLabel>
+                                                    <Controller name="box.boxContent" control={control} render={({ field }) => (
+                                                        <Textarea id="box-content" rows={3} placeholder="Short supportive content for the callout box." {...field} value={field.value ?? ""} className="mt-1" />
+                                                    )} />
+                                                    <Hint>Leave empty to hide the highlight box on the page.</Hint>
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        {/* Tags */}
+                                        <Section>
+                                            <SectionHeader title="Tags" desc="Add SEO-friendly tags to help with internal linking and discovery." icon={<FiTag className="size-4" />} />
+                                            <FieldLabel>Tags</FieldLabel>
+                                            <div className="flex gap-2 mt-1">
+                                                <div className="relative flex-1">
+                                                    <FiTag className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                                                    <Input value={tagInput} onChange={(e) => setTagInput(e.target.value)}
+                                                        placeholder="Add a tag and press Enter" className="pl-8"
+                                                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }} />
+                                                </div>
+                                                <Button type="button" size="sm" variant="outline" onClick={addTag}>Add</Button>
+                                            </div>
+                                            <div className="mt-2.5 flex flex-wrap gap-1.5 min-h-[24px]">
+                                                {tags.length === 0 && <span className="text-xs text-slate-400">No tags added yet.</span>}
+                                                {tags.map((tag) => (
+                                                    <span key={tag} className="flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-primary">
+                                                        {tag}
+                                                        <button type="button" onClick={() => removeTag(tag)} className="rounded-full p-0.5 text-primary hover:bg-indigo-100 hover:text-rose-600" aria-label={`Remove ${tag}`}>
+                                                            <FiX className="size-3" />
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </Section>
+
+                                        {/* FAQs */}
+                                        <Section>
+                                            <SectionHeader title="FAQs" desc="Answer common customer questions to build trust." icon={<FiHelpCircle className="size-4" />} />
+                                            <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 mb-4">
+                                                <div className="grid gap-3">
+                                                    <div>
+                                                        <FieldLabel htmlFor="faq-question">Question</FieldLabel>
+                                                        <Input id="faq-question" name="question" value={currentFaq.question} onChange={handleFaqChange}
+                                                            placeholder="e.g., How long does delivery take?" className="mt-1" />
+                                                    </div>
+                                                    <div>
+                                                        <FieldLabel htmlFor="faq-answer">Answer</FieldLabel>
+                                                        <Textarea id="faq-answer" name="answer" value={currentFaq.answer} onChange={handleFaqChange}
+                                                            placeholder="Write a clear, helpful answer" rows={2} className="mt-1" />
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button type="button" size="sm" onClick={addOrUpdateFaq}>
+                                                            {editingFaqIndex !== null ? "Update FAQ" : "Add FAQ"}
+                                                        </Button>
+                                                        {editingFaqIndex !== null && (
+                                                            <Button type="button" size="sm" variant="outline" onClick={cancelEditFaq}>Cancel</Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {faqs.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    <div className="mb-2 flex items-center gap-2">
+                                                        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Published FAQs</h3>
+                                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{faqs.length}</span>
+                                                    </div>
+                                                    {faqs.map((faq, index) => (
+                                                        <div key={`${faq.question}-${index}`}
+                                                            className={`flex items-start justify-between gap-4 rounded-lg border bg-white p-3 transition ${editingFaqIndex === index ? "border-emerald-300 ring-1 ring-emerald-200" : "border-slate-200 hover:border-slate-300"}`}>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-medium text-slate-800">{faq.question}</p>
+                                                                <p className="mt-1 text-xs leading-relaxed text-slate-500">{faq.answer}</p>
+                                                            </div>
+                                                            <div className="flex shrink-0 gap-1">
+                                                                <button type="button" onClick={() => editFaq(index)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                                                                    <FiEdit2 className="size-3.5" />
+                                                                </button>
+                                                                <button type="button" onClick={() => deleteFaq(index)} className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                                                                    <FiTrash2 className="size-3.5" />
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemove(index)}
-                                                            className="absolute right-1 top-1 rounded-full bg-rose-500 p-1.5 text-white opacity-0 shadow-md transition group-hover:opacity-100 hover:bg-rose-600"
-                                                            aria-label="Remove image"
-                                                        >
-                                                            <FiX className="size-3" />
-                                                        </button>
-                                                        {img.alt ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => startEditAlt(index)}
-                                                                className="absolute inset-x-0 bottom-0 truncate bg-black/60 p-1.5 text-left text-[11px] text-white transition hover:bg-black/75"
-                                                                title="Edit alt text"
-                                                            >
-                                                                {img.alt}
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => startEditAlt(index)}
-                                                                className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-amber-500 w-fit text-nowrap px-2.5 py-1 text-[11px] font-medium text-white shadow-md transition hover:bg-amber-600"
-                                                            >
-                                                                <FiEdit2 className="size-3" /> Add alt text
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        ))}
-
-                                        {(image?.length ?? 0) < IMAGE_MAX && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowGallery(true)}
-                                                className="flex size-48 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 transition hover:border-primary hover:bg-primary/5 hover:text-primary"
-                                            >
-                                                <FiUploadCloud className="size-7" />
-                                                <span className="text-xs font-medium">Add image</span>
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5">
-                                        {checks.map((c) => (
-                                            <span
-                                                key={c.label}
-                                                className={`flex items-center gap-1.5 text-xs font-medium ${c.ok ? "text-emerald-600" : "text-rose-600"
-                                                    }`}
-                                            >
-                                                {c.ok ? (
-                                                    <FiCheckCircle className="size-3.5" />
-                                                ) : (
-                                                    <FiXCircle className="size-3.5" />
-                                                )}
-                                                {c.label}
-                                            </span>
-                                        ))}
-                                        <span className="ml-auto text-xs text-slate-400">
-                                            {validation.total} image
-                                            {validation.total !== 1 ? "s" : ""} added
-                                        </span>
-                                    </div>
-                                    <FieldErrorMsg message={errors.image?.message as string} />
-                                </div>
-                            </CardWithTitleAndIcon>
-
-                            {/* ---------------- FAQs ---------------- */}
-                            <CardWithTitleAndIcon
-                                title="FAQs"
-                                description="Add frequently asked questions and answers about your locationPage."
-                                icon={<FiHelpCircle className="size-4.5" />}
-                            >
-                                <div className="space-y-3 ring-1 ring-slate-200 mb-6 rounded-xl bg-slate-50/80 p-6 m-0.5">
-                                    <div>
-                                        <FieldLabel htmlFor="faq-question">Question</FieldLabel>
-                                        <Input
-                                            id="faq-question"
-                                            name="question"
-                                            value={currentFaq.question}
-                                            onChange={handleFaqChange}
-                                            placeholder="e.g., Is this locationPage machine washable?"
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                    <div>
-                                        <FieldLabel htmlFor="faq-answer">Answer</FieldLabel>
-                                        <Textarea
-                                            id="faq-answer"
-                                            name="answer"
-                                            value={currentFaq.answer}
-                                            onChange={handleFaqChange}
-                                            placeholder="Write a clear, helpful answer"
-                                            rows={3}
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2 pt-1">
-                                        <Button type="button" onClick={addOrUpdateFaq}>
-                                            {editingFaqIndex !== null ? "Update FAQ" : "Add FAQ"}
-                                        </Button>
-                                        {editingFaqIndex !== null && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={cancelEditFaq}
-                                            >
-                                                Cancel
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="mb-3 flex items-center gap-2">
-                                        <h3 className="text-sm font-semibold text-slate-700">
-                                            Published FAQs
-                                        </h3>
-                                        {faqs && faqs.length > 0 && (
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                                                {faqs.length}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {faqs && faqs?.length === 0 ? (
-                                        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 py-10 text-center text-slate-400">
-                                            <FiHelpCircle className="size-6" />
-                                            <p className="text-sm">
-                                                No FAQs yet — add your first one above.
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2.5">
-                                            {faqs?.map((faq, index) => (
-                                                <div
-                                                    key={`${faq.question}-${index}`}
-                                                    className={`flex items-start justify-between gap-4 rounded-xl border bg-white p-4 shadow-xs transition ${editingFaqIndex === index
-                                                        ? "border-emerald-300 ring-1 ring-emerald-200"
-                                                        : "border-slate-200 hover:border-slate-300"
-                                                        }`}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-slate-800">
-                                                            {faq.question}
-                                                        </p>
-                                                        <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                                                            {faq.answer}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex shrink-0 gap-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => editFaq(index)}
-                                                            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                                                            aria-label="Edit FAQ"
-                                                        >
-                                                            <FiEdit2 className="size-4" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => deleteFaq(index)}
-                                                            className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-                                                            aria-label="Delete FAQ"
-                                                        >
-                                                            <FiTrash2 className="size-4" />
-                                                        </button>
-                                                    </div>
+                                                    ))}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </CardWithTitleAndIcon>
-
-                            {/* ---------------- Categorization ---------------- */}
-                            {/* <CardWithTitleAndIcon
-                                title="Categorization"
-                                description="Categorize your locationPage to help customers find it more easily."
-                                icon={<FiGrid className="size-4.5" />}
-                            >
-                                <div className="grid grid-cols-1 gap-x-6 gap-y-6 md:grid-cols-2 p-6 ring-1 ring-slate-200 rounded-xl bg-slate-50/80 m-0.5">
-                                    <div className="space-y-5 text-sm">
-                                        {renderMultiSelect(
-                                            "Industries",
-                                            industriesDropdown,
-                                            selectedIndustries,
-                                            industryDropdownOpen,
-                                            () => setIndustryDropdownOpen(!industryDropdownOpen),
-                                            handleIndustrySelection,
-                                            "bg-emerald-50 text-emerald-700",
-                                            "text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700"
-                                        )}
-                                        {renderMultiSelect(
-                                            "Materials",
-                                            materialsDropdown,
-                                            selectedMaterials,
-                                            materialDropdownOpen,
-                                            () => setMaterialDropdownOpen(!materialDropdownOpen),
-                                            handleMaterialSelection,
-                                            "bg-blue-50 text-blue-700",
-                                            "text-blue-500 hover:bg-blue-100 hover:text-blue-700"
-                                        )}
-                                        {renderMultiSelect(
-                                            "Styles",
-                                            stylesDropdown,
-                                            selectedStyles,
-                                            styleDropdownOpen,
-                                            () => setStyleDropdownOpen(!styleDropdownOpen),
-                                            handleStyleSelection,
-                                            "bg-violet-50 text-violet-700",
-                                            "text-violet-500 hover:bg-violet-100 hover:text-violet-700"
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <FieldLabel>Tags</FieldLabel>
-                                        <div className="flex gap-2 mt-1">
-                                            <div className="relative flex-1">
-                                                <FiTag className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
-                                                <Controller
-                                                    name="tags"
-                                                    control={control}
-                                                    render={() => (
-                                                        <Input
-                                                            value={tagInput}
-                                                            onChange={(e) => setTagInput(e.target.value)}
-                                                            placeholder="Add a tag and press Enter"
-                                                            className="pl-8"
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter") {
-                                                                    e.preventDefault();
-                                                                    addTag();
-                                                                }
-                                                            }}
-                                                        />
-                                                    )}
-                                                />
-                                            </div>
-                                            <Button type="button" variant="outline" onClick={addTag}>
-                                                Add
-                                            </Button>
-                                        </div>
-                                        <div className="mt-2.5 flex flex-wrap gap-1.5">
-                                            {tags.length === 0 && (
-                                                <span className="text-xs text-slate-400">
-                                                    No tags added yet.
-                                                </span>
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 py-6 text-center text-slate-400">
+                                                    <FiHelpCircle className="size-5" />
+                                                    <p className="text-xs">No FAQs yet — add your first one above.</p>
+                                                </div>
                                             )}
-                                            {tags.map((tag) => (
-                                                <span
-                                                    key={tag}
-                                                    className="flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
-                                                >
-                                                    {tag}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeTag(tag)}
-                                                        className="rounded-full p-0.5 text-indigo-400 transition hover:bg-indigo-100 hover:text-rose-600"
-                                                        aria-label={`Remove ${tag}`}
-                                                    >
-                                                        <FiX className="size-3" />
-                                                    </button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <FieldErrorMsg message={errors.tags?.message as string} />
-                                    </div>
-                                </div>
-                            </CardWithTitleAndIcon> */}
+                                        </Section>
 
-                            {/* ---------------- Settings ---------------- */}
-                            <CardWithTitleAndIcon
-                                title="Settings"
-                                description="Set the visibility and availability of your locationPage."
-                                icon={<FiGrid className="size-4.5" />}
-                            >
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 ring-1 ring-slate-200 rounded-xl bg-slate-50/80 m-0.5">
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-800 mb-4">
-                                            locationPage Status
-                                        </h3>
-                                        <div className="space-y-4">
+                                        {/* Publishing */}
+                                        <Section>
+                                            <SectionHeader title="Publishing" desc="Control when this location page is visible." icon={<FiSettings className="size-4" />} />
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                                    Status
-                                                </label>
-                                                <Controller
-                                                    name="status"
-                                                    control={control}
-                                                    render={({ field }) => (
-                                                        <select
-                                                            id="status"
-                                                            {...field}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-300 outline-none rounded-lg text-sm text-slate-700 shadow-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                                                        >
-                                                            <option value="DRAFT">Draft</option>
-                                                            <option value="PUBLISHED">Published</option>
-                                                            {/* <option value="archived">Archived</option> */}
-                                                        </select>
-                                                    )}
-                                                />
+                                                <FieldLabel htmlFor="status">Status</FieldLabel>
+                                                <Controller name="status" control={control} render={({ field }) => (
+                                                    <select id="status" {...field}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 outline-none rounded-lg text-sm text-slate-700 shadow-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                                        <option value="DRAFT">Draft — hidden from public</option>
+                                                        <option value="PUBLISHED">Published — visible on site</option>
+                                                    </select>
+                                                )} />
                                                 <FieldErrorMsg message={errors.status?.message as string} />
                                             </div>
-                                        </div>
+                                        </Section>
                                     </div>
-                                </div>
-                            </CardWithTitleAndIcon>
+                                )}
+
+                                {/* ---------- RELATED ---------- */}
+                                {activeTab === "related" && (
+                                    <Section>
+                                        <SectionHeader
+                                            title="Related Products"
+                                            desc="Link complementary products to display on the product detail page."
+                                            icon={<FiLayers className="size-4" />}
+                                        />
+                                        <div>
+                                            <FieldLabel>Select related products</FieldLabel>
+                                            <div className="mt-1">
+                                                <AsyncSelect
+                                                    isMulti
+                                                    cacheOptions
+                                                    defaultOptions
+                                                    loadOptions={loadRelatedProductOptions}
+                                                    placeholder="Search products..."
+                                                    value={(relatedProducts ?? []).map((p) => ({
+                                                        value: p.pid,
+                                                        label: p.name,
+                                                        slug: p.slug,
+                                                        imageUrl: p.imageUrl,
+                                                    }))}
+                                                    onChange={(selected) => {
+                                                        const next = (selected ?? []).map((item: any) => ({
+                                                            pid: item.value,
+                                                            name: item.label,
+                                                            slug: item.slug,
+                                                            imageUrl: item.imageUrl,
+                                                        }));
+                                                        setValue("relatedProducts", next, { shouldValidate: true, shouldDirty: true });
+                                                    }}
+                                                    styles={{
+                                                        control: (base) => ({
+                                                            ...base,
+                                                            minHeight: 38,
+                                                            borderColor: "#cbd5e1",
+                                                            boxShadow: "none",
+                                                            "&:hover": { borderColor: "#818cf8" },
+                                                        }),
+                                                        multiValue: (base) => ({
+                                                            ...base,
+                                                            backgroundColor: "#eef2ff",
+                                                            color: "#4338ca",
+                                                        }),
+                                                        multiValueLabel: (base) => ({
+                                                            ...base,
+                                                            color: "#4338ca",
+                                                            fontWeight: 500,
+                                                        }),
+                                                        multiValueRemove: (base) => ({
+                                                            ...base,
+                                                            color: "#6366f1",
+                                                            "&:hover": { backgroundColor: "#e0e7ff", color: "#dc2626" },
+                                                        }),
+                                                    }}
+                                                />
+                                            </div>
+                                            <Hint>Search by product name. Changes are saved when you submit the form.</Hint>
+                                            <FieldErrorMsg message={errors.relatedProducts?.message as string} />
+                                        </div>
+
+                                        {/* Selected products preview */}
+                                        {relatedProducts.length > 0 && (
+                                            <div className="mt-4 space-y-2">
+                                                <div className="mb-2 flex items-center gap-2">
+                                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected products</h3>
+                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                                                        {relatedProducts.length}
+                                                    </span>
+                                                </div>
+                                                {relatedProducts.map((p, idx) => (
+                                                    <div
+                                                        key={`${p.pid}-${idx}`}
+                                                        className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 transition hover:border-slate-300"
+                                                    >
+                                                        {p.imageUrl?.url ? (
+                                                            <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-slate-100">
+                                                                <Image src={p.imageUrl.url} alt={p.imageUrl.alt || p.name} fill className="object-cover" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-400">
+                                                                <FiImage className="size-4" />
+                                                            </div>
+                                                        )}
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
+                                                            <p className="truncate text-xs text-slate-500">/products/{p.slug}</p>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setValue(
+                                                                    "relatedProducts",
+                                                                    relatedProducts.filter((_, i) => i !== idx),
+                                                                    { shouldValidate: true, shouldDirty: true }
+                                                                )
+                                                            }
+                                                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                                            aria-label={`Remove ${p.name}`}
+                                                        >
+                                                            <FiTrash2 className="size-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </Section>
+                                )}
+                            </div>
                         </ScrollArea>
 
-                        {/* ---------------- Footer ---------------- */}
-                        <DialogFooter className="border-t border-border bg-white w-full px-6 py-4 flex items-center justify-end gap-2 absolute bottom-0 left-0 right-0">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={onCancel}
-                                disabled={loading || isSubmitting}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={loading || isSubmitting}
-                                className="min-w-[140px]"
-                            >
-                                {loading || isSubmitting ? (
-                                    <>
-                                        <LoaderCircle className="animate-spin" />
-                                        Processing...
-                                    </>
-                                ) : (
-                                    <>
-                                        {isEditMode ? "Update locationPage" : "Create locationPage"}
-                                    </>
-                                )}
-                            </Button>
+                        {/* Footer */}
+                        <DialogFooter className="border-t border-slate-200 bg-white px-6 py-3 flex items-center justify-between">
+                            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+                                <Check className="size-3.5 text-emerald-500" />
+                                All changes saved locally — click {isEditMode ? "Update" : "Create"} to submit.
+                            </div>
+                            <div className="flex items-center gap-2 ml-auto">
+                                <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting} className="min-w-[140px] bg-primary/90 hover:bg-primary">
+                                    {isSubmitting ? (
+                                        <><LoaderCircle className="animate-spin" /> Processing...</>
+                                    ) : (
+                                        <>{isEditMode ? "Update Location Page" : "Create Location Page"}</>
+                                    )}
+                                </Button>
+                            </div>
                         </DialogFooter>
                     </form>
-                </DialogContent >
-            </Dialog >
+                </DialogContent>
+            </Dialog>
+
             {showGallery && (
-                <WebsiteGalleryModel
-                    onCancel={handleGalleryClose}
-                    onSentSelected={handleGallerySelect}
-                    mode="multiple"
-                />
+                <WebsiteGalleryModel onCancel={handleGalleryClose} onSentSelected={handleGallerySelect} mode="multiple" />
+            )}
+            {showBoxGallery && (
+                <WebsiteGalleryModel onCancel={() => setShowBoxGallery(false)} onSentSelected={handleBoxGallerySelect} mode="single" />
             )}
         </>
-    )
-}
+    );
+};
 
-export default AddlocationPage
+export default AddlocationPage;

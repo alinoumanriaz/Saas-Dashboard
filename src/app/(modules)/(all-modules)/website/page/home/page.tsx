@@ -599,7 +599,7 @@ const Page = () => {
               size="sm"
               onClick={handleSave}
               disabled={updating || !tempContent.trim()}
-              className="gap-2 bg-primary/90 hover:bg-primary min-w-[130px]"
+              className="gap-2 bg-primary/90 hover:bg-primary min-w-32.5"
             >
               {updating ? (
                 <>

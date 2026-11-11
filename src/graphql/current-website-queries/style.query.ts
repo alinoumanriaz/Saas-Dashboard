@@ -30,6 +30,7 @@ export const GET_PAGINATED_STYLES = gql`
           answer
           order
         }
+        status
         createdAt
         updatedAt
       }
@@ -84,6 +85,7 @@ export const GET_ALL_STYLES = gql`
           answer
           order
         }
+      status
       createdAt
       updatedAt
     }

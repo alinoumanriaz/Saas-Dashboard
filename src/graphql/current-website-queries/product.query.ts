@@ -63,6 +63,15 @@ query GetPaginatedProducts(
       lowPrice
       highPrice
       moq
+      relatedProducts {
+      pid
+      name
+      slug
+      imageUrl {
+      url
+      alt
+      }
+      }
       createdAt
       updatedAt
     }
@@ -222,4 +231,15 @@ query CheckProductMetaTitleUnique($metaTitle: String!, $excludeId: String) {
     message
   }
 }
+`;
+
+export const SEARCH_PRODUCTS = gql`
+  query GetRelatedProducts($search: String) {
+    getRelatedProducts( search: $search) {
+      id
+      name
+      slug
+      imageUrl { url alt }
+    }
+  }
 `;

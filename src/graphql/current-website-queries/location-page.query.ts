@@ -55,7 +55,7 @@ mutation DeleteLocationPages($ids: [ID!]!) {
 `
 
 export const CREATE_LOCATION_PAGES = gql`
-mutation CreateLocationPage($input: CreateLocationPageInput!) {
+mutation CreateLocationPage($input: CreateLocationDto!) {
   createLocationPage(input: $input) {
     success
     message
@@ -63,7 +63,7 @@ mutation CreateLocationPage($input: CreateLocationPageInput!) {
 }`
 
 export const UPDATE_LOCATION_PAGES = gql`
-mutation UpdateLocationPage($id: ID!, $input: UpdateLocationPageInput!) {
+mutation UpdateLocationPage($id: ID!, $input: UpdateLocationDto!) {
   updateLocationPage(id: $id, input: $input) {
     success
     message

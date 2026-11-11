@@ -30,6 +30,7 @@ export const GET_PAGINATED_INDUSTRIES = gql`
           answer
           order
         }
+        status
         createdAt
         updatedAt
       }
@@ -84,6 +85,7 @@ export const GET_ALL_INDUSTRY = gql`
           answer
           order
         }
+      status
       createdAt
       updatedAt
     }
