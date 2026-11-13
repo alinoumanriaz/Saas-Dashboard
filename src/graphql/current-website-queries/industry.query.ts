@@ -12,7 +12,7 @@ export const GET_PAGINATED_INDUSTRIES = gql`
         h1Tag
         metaDescription
         metaTitle
-        imageUrl {
+        image {
           url
           alt
         }
@@ -20,7 +20,7 @@ export const GET_PAGINATED_INDUSTRIES = gql`
         url
         alt
         }
-        iconImageUrl {
+        iconImage {
         url
         alt
         }
@@ -75,8 +75,8 @@ export const GET_ALL_INDUSTRY = gql`
       id
       name
       slug
-      iconImageUrl
-      imageUrl
+      iconImage
+      image
       bannerImage
       shortDescription
       content

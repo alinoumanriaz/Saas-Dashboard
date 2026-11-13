@@ -26,10 +26,10 @@ interface IProduct {
   h1Tag?: string;
   metaTitle?: string;
   metaDescription?: string;
-  description?: string;
+  content?: string;
   shortDescription?: string;
   specification?: any;
-  imageUrl: string | { url: string; alt?: string } | string[];
+  images: string | { url: string; alt?: string } | string[];
   status?: string;
   author?: any;
   isFeatured?: boolean;
@@ -239,14 +239,14 @@ const Page = () => {
 
 
   // Table columns and custom renderers
-  const columns = ["image", "name", "slug", "h1Tag", "metaTitle", "metaDescription", "description", "status", "author", "isFeatured", "createdAt", "updatedAt"];
+  const columns = ["image", "name", "slug", "h1Tag", "metaTitle", "metaDescription", "content", "status", "author", "isFeatured", "createdAt", "updatedAt"];
 
   const customRenderers = {
     image: (value: string, row: any) => (
       <div className="flex relative items-center justify-center">
-        {row.imageUrl && (
+        {row.images && (
           <Image
-            src={row.imageUrl[0].url}
+            src={row.images[0].url}
             alt={row.name}
             className="h-10 w-10 rounded object-cover"
             width={40}
@@ -254,10 +254,10 @@ const Page = () => {
           />
         )}
         <div
-          className={`absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-background ${row.imageUrl.length < 2 ? "bg-red-500" : "bg-green-500"
+          className={`absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-background ${row.images.length < 2 ? "bg-red-500" : "bg-green-500"
             }`}
         >
-          {row.imageUrl.length}
+          {row.images.length}
         </div>
       </div>
     ),
@@ -286,7 +286,7 @@ const Page = () => {
         {value || "—"}
       </div>
     ),
-    description: (value: string) => {
+    content: (value: string) => {
 
       const wordCount = countWords(value ?? "");
 

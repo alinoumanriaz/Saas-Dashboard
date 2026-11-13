@@ -63,7 +63,7 @@ interface FaqItem {
   answer: string;
 }
 
-type ImageMode = "imageUrl" | "bannerImage" | "iconImageUrl";
+type ImageMode = "image" | "bannerImage" | "iconImage";
 
 interface AddIndustryProps {
   onCancel: () => void;
@@ -113,9 +113,9 @@ const industryFormSchema = z.object({
   metaDescription: z.string().optional(),
   shortDescription: z.string().optional(),
   content: z.string().optional(),
-  imageUrl: imageObjectSchema.nullable().optional(), // single
+  image: imageObjectSchema.nullable().optional(), // single
   bannerImage: imageObjectSchema.nullable().optional(), // single
-  iconImageUrl: imageObjectSchema.nullable().optional(), // single
+  iconImage: imageObjectSchema.nullable().optional(), // single
   faqs: z.array(z.any()).default([]),
   status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
 });
@@ -284,8 +284,8 @@ const AddIndustry = ({
 
   /* ---------- Gallery & alt edit ---------- */
   const [showGallery, setShowGallery] = useState(false);
-  const [galleryMode, setGalleryMode] = useState<ImageMode>("imageUrl");
-  // sentinel: "imageUrl" | "bannerImage" | "iconImageUrl" | null
+  const [galleryMode, setGalleryMode] = useState<ImageMode>("image");
+  // sentinel: "image" | "bannerImage" | "iconImage" | null
   const [editingAltOf, setEditingAltOf] = useState<ImageMode | null>(null);
   const [altInput, setAltInput] = useState("");
 
@@ -315,10 +315,10 @@ const AddIndustry = ({
       metaDescription: selectedData?.metaDescription || "",
       shortDescription: selectedData?.shortDescription || "",
       content: selectedData?.content || "",
-      imageUrl: toSingleImage(selectedData?.imageUrl),
+      image: toSingleImage(selectedData?.image),
       bannerImage: toSingleImage(selectedData?.bannerImage),
-      iconImageUrl: toSingleImage(
-        selectedData?.iconImageUrl || selectedData?.iconName
+      iconImage: toSingleImage(
+        selectedData?.iconImage || selectedData?.iconName
       ),
       faqs: selectedData?.faqs || [],
       status: selectedData?.status || "DRAFT",
@@ -336,10 +336,10 @@ const AddIndustry = ({
       metaDescription: selectedData.metaDescription || "",
       shortDescription: selectedData.shortDescription || "",
       content: selectedData.content || "",
-      imageUrl: toSingleImage(selectedData.imageUrl),
+      image: toSingleImage(selectedData.image),
       bannerImage: toSingleImage(selectedData.bannerImage),
-      iconImageUrl: toSingleImage(
-        selectedData.iconImageUrl || selectedData.iconName
+      iconImage: toSingleImage(
+        selectedData.iconImage || selectedData.iconName
       ),
       faqs: selectedData.faqs || [],
       status: selectedData.status || "DRAFT",
@@ -360,9 +360,9 @@ const AddIndustry = ({
         ? "text-amber-500"
         : "text-emerald-600";
 
-  const imageUrl = watch("imageUrl");
+  const image = watch("image");
   const bannerImage = watch("bannerImage");
-  const iconImageUrl = watch("iconImageUrl");
+  const iconImage = watch("iconImage");
   const faqs = watch("faqs") ?? [];
 
   /* ---------- Queries ---------- */
@@ -473,14 +473,14 @@ const AddIndustry = ({
     // Ensure all image fields are pure { url, alt } objects
     const payload = {
       ...clean,
-      imageUrl: clean.imageUrl
-        ? { url: clean.imageUrl.url, alt: clean.imageUrl.alt || "" }
+      image: clean.image
+        ? { url: clean.image.url, alt: clean.image.alt || "" }
         : null,
       bannerImage: clean.bannerImage
         ? { url: clean.bannerImage.url, alt: clean.bannerImage.alt || "" }
         : null,
-      iconImageUrl: clean.iconImageUrl
-        ? { url: clean.iconImageUrl.url, alt: clean.iconImageUrl.alt || "" }
+      iconImage: clean.iconImage
+        ? { url: clean.iconImage.url, alt: clean.iconImage.alt || "" }
         : null,
     };
 
@@ -542,11 +542,11 @@ const AddIndustry = ({
   const startEditAlt = (mode: ImageMode) => {
     setEditingAltOf(mode);
     const current =
-      mode === "imageUrl"
-        ? imageUrl
+      mode === "image"
+        ? image
         : mode === "bannerImage"
           ? bannerImage
-          : iconImageUrl;
+          : iconImage;
     setAltInput(current?.alt ?? "");
   };
   const cancelEditAlt = () => {
@@ -556,11 +556,11 @@ const AddIndustry = ({
   const saveAlt = () => {
     if (!editingAltOf) return;
     const current =
-      editingAltOf === "imageUrl"
-        ? imageUrl
+      editingAltOf === "image"
+        ? image
         : editingAltOf === "bannerImage"
           ? bannerImage
-          : iconImageUrl;
+          : iconImage;
     if (!current) {
       cancelEditAlt();
       return;
@@ -575,12 +575,12 @@ const AddIndustry = ({
 
   /* ---------- Validation summary ---------- */
   const validation = {
-    hasPrimary: !!imageUrl?.url,
+    hasPrimary: !!image?.url,
     hasAlt:
-      !!imageUrl?.alt?.trim() ||
+      !!image?.alt?.trim() ||
       !!bannerImage?.alt?.trim() ||
-      !!iconImageUrl?.alt?.trim(),
-    slotsFilled: [imageUrl, bannerImage, iconImageUrl].filter((i) => !!i?.url)
+      !!iconImage?.alt?.trim(),
+    slotsFilled: [image, bannerImage, iconImage].filter((i) => !!i?.url)
       .length,
   };
   const checks = [
@@ -686,11 +686,11 @@ const AddIndustry = ({
    * ============================================================ */
   const renderAltEditor = (mode: ImageMode) => {
     const current =
-      mode === "imageUrl"
-        ? imageUrl
+      mode === "image"
+        ? image
         : mode === "bannerImage"
           ? bannerImage
-          : iconImageUrl;
+          : iconImage;
     if (editingAltOf !== mode || !current) return null;
     return (
       <div className="absolute inset-0 flex flex-col bg-slate-900/90 p-2">
@@ -729,11 +729,11 @@ const AddIndustry = ({
 
   const renderImageCard = (mode: ImageMode, label: string) => {
     const img =
-      mode === "imageUrl"
-        ? imageUrl
+      mode === "image"
+        ? image
         : mode === "bannerImage"
           ? bannerImage
-          : iconImageUrl;
+          : iconImage;
 
     return (
       <div className="space-y-2">
@@ -1133,9 +1133,9 @@ const AddIndustry = ({
                       />
 
                       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                        {renderImageCard("imageUrl", "Primary image")}
+                        {renderImageCard("image", "Primary image")}
                         {renderImageCard("bannerImage", "Banner image")}
-                        {renderImageCard("iconImageUrl", "Icon image")}
+                        {renderImageCard("iconImage", "Icon image")}
                       </div>
 
                       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5">
@@ -1161,9 +1161,9 @@ const AddIndustry = ({
 
                       <FieldErrorMsg
                         message={
-                          errors.imageUrl?.message ||
+                          errors.image?.message ||
                           errors.bannerImage?.message ||
-                          errors.iconImageUrl?.message
+                          errors.iconImage?.message
                         }
                       />
 

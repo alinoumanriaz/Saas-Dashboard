@@ -16,16 +16,17 @@ import {
 import ConfirmationBox from "@/components/popup/models/ConfirmationBox";
 import AddIndustry from "@/components/popup/models/AddIndustry.model";
 import Image from "next/image";
+import { countWords } from "@/helpers/wordCounter";
 
 // --- Types ---
 interface IIndustry {
   id: string;
   name: string;
   slug: string;
-  iconImageUrl: string | { url: string; alt?: string };
-  imageUrl: string | { url: string; alt?: string };
+  iconImage: string | { url: string; alt?: string };
+  image: string | { url: string; alt?: string };
   bannerImage: string | { url: string; alt?: string };
-  description: string;
+  shortDescription: string;
   content: string | any;
   createdAt?: string;
   updatedAt?: string;
@@ -34,11 +35,11 @@ interface IIndustry {
 const ITEMS_PER_PAGE = 10;
 
 // Helper to extract image URL
-const getImageUrl = (field: any): string => {
-  if (!field) return "";
-  if (typeof field === "string") return field;
-  return field.url || "";
-};
+// const getImageUrl = (field: any): string => {
+//   if (!field) return "";
+//   if (typeof field === "string") return field;
+//   return field.url || "";
+// };
 
 const Page = () => {
   const companyCurrentWebsite = useAppSelector(
@@ -205,23 +206,23 @@ const Page = () => {
   };
 
   // Columns and custom renderers
-  const columns = ["images", "name", "slug", "description", "content", "createdAt", "updatedAt"];
+  const columns = ["images", "name", "slug", "shortDescription", "content", "createdAt", "updatedAt"];
 
   const customRenderers = {
     images: (value: string, row: any) => (
       <div className="flex items-center gap-2">
-        {row.iconImageUrl && (
+        {row.iconImage && (
           <Image
-            src={getImageUrl(row.iconImageUrl)}
+            src={row.iconImage.url}
             alt={row.name}
             className="h-8 w-8 rounded object-cover"
             width={80}
             height={80}
           />
         )}
-        {row.imageUrl && (
+        {row.image && (
           <Image
-            src={getImageUrl(row.imageUrl[0])}
+            src={row.image.url}
             alt={row.name}
             className="h-8 w-8 rounded object-cover"
             width={80}
@@ -230,7 +231,7 @@ const Page = () => {
         )}
         {row.bannerImage && (
           <Image
-            src={getImageUrl(row.bannerImage)}
+            src={row.bannerImage.url}
             alt={row.name}
             className="h-8 w-8 rounded object-cover"
             width={80}
@@ -244,25 +245,33 @@ const Page = () => {
         <span className="font-medium">{value}</span>
       </div>
     ),
-    description: (value: string) => (
+    shortDescription: (value: string) => (
       <div className="max-w-50 truncate" title={value || ""}>
         {value || "—"}
       </div>
     ),
-    content: (value: any) => {
-      if (!value) return "—";
-      let display = "";
-      if (typeof value === "string") {
-        display = value;
-      } else if (typeof value === "object") {
-        display = value.text || value.content || JSON.stringify(value);
-      }
-      const truncated = display.length > 80 ? display.substring(0, 80) + "..." : display;
+    content: (value: string) => {
+
+      const wordCount = countWords(value ?? "");
+
+      const countColor =
+        wordCount < 500
+          ? "bg-red-500 text-white"
+          : wordCount <= 800
+            ? "bg-yellow-500"
+            : "bg-green-500";
       return (
-        <div className="max-w-50 truncate" title={display}>
-          {truncated || "—"}
-        </div>
-      );
+        <>
+
+          <div className={` max-w-37.5 truncate`} title={value || ""}>
+            <span className={`${countColor} rounded-md px-1 py-0.5`}>
+              {wordCount}
+            </span>
+            {value || "—"}
+          </div>
+        </>
+
+      )
     },
     createdAt: (value: string) =>
       value ? new Date(value).toLocaleDateString() : "—",

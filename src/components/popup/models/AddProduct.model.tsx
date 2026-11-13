@@ -58,9 +58,9 @@ const productFormSchema = z.object({
     metaTitle: z.string().min(1, "Meta Title is required"),
     metaDescription: z.string().optional(),
     shortDescription: z.string().optional(),
-    description: z.string().optional(),
+    content: z.string().optional(),
     specification: z.string().optional(),
-    imageUrl: z.array(z.object({ url: z.string().url("Invalid image URL"), alt: z.string().max(ALT_TEXT_MAX) })).min(IMAGE_MIN).max(IMAGE_MAX),
+    images: z.array(z.object({ url: z.string().url("Invalid image URL"), alt: z.string().max(ALT_TEXT_MAX) })).min(IMAGE_MIN).max(IMAGE_MAX),
     industries: z.array(z.string()).default([]),
     materials: z.array(z.string()).default([]),
     styles: z.array(z.string()).default([]),
@@ -75,7 +75,7 @@ const productFormSchema = z.object({
         pid: z.string(),
         name: z.string(),
         slug: z.string(),
-        imageUrl: z.object({ url: z.string().optional(), alt: z.string().optional() }).optional(),
+        image: z.object({ url: z.string().optional(), alt: z.string().optional() }).optional(),
     })).default([]),
 });
 
@@ -144,9 +144,9 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
             metaTitle: selectedData?.metaTitle || "",
             metaDescription: selectedData?.metaDescription || "",
             shortDescription: selectedData?.shortDescription || "",
-            description: selectedData?.description || "",
+            content: selectedData?.content || "",
             specification: selectedData?.specification || "",
-            imageUrl: selectedData?.imageUrl || [],
+            images: selectedData?.images || [],
             faqs: selectedData?.faqs || [],
             industries: (selectedData?.industries || []).map((i: any) => typeof i === "string" ? i : i.id),
             materials: (selectedData?.materials || []).map((i: any) => typeof i === "string" ? i : i.id),
@@ -168,7 +168,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
     const metaDescription = watch("metaDescription");
     const descLength = metaDescription?.length ?? 0;
     const descTone = descLength > META_DESCRIPTION_MAX ? "text-rose-500" : descLength > 150 ? "text-amber-500" : "text-emerald-600";
-    const imageUrl = watch("imageUrl") ?? [];
+    const images = watch("images") ?? [];
     const faqs = watch("faqs") ?? [];
     const tags = watch("tags") ?? [];
     const selectedIndustries = watch("industries") ?? [];
@@ -179,8 +179,8 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
     /* -------- Submit -------- */
     const onSubmit = async (values: any) => {
         console.log({ submitResult: values })
-        if (values.imageUrl.length < IMAGE_MIN) { toast.error(`Please add at least ${IMAGE_MIN} image`); return; }
-        if (values.imageUrl.length > IMAGE_MAX) { toast.error(`Max ${IMAGE_MAX} images`); return; }
+        if (values.images.length < IMAGE_MIN) { toast.error(`Please add at least ${IMAGE_MIN} image`); return; }
+        if (values.images.length > IMAGE_MAX) { toast.error(`Max ${IMAGE_MAX} images`); return; }
         if (!companyMember?.id) { toast.error("Unable to identify the current user."); return; }
 
         const clean = removeTypename(values);
@@ -191,7 +191,10 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                 if (result.data?.updateProduct?.success) {
                     toast.success(result.data.updateProduct.message || "Product updated");
                     refetch?.(); onCancel();
-                } else toast.error(result.data?.updateProduct?.message || "Update failed");
+                } else {
+                    console.log(result.data?.updateProduct?.message || "Update failed")
+                    toast.error(result.data?.updateProduct?.message || "Update failed")
+                };
             } else {
                 const result = await createProduct({ variables: { input: clean } });
                 if (result.data?.createProduct?.success) {
@@ -243,29 +246,29 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
     const checkH1TagUnique = (h: string) => { if (!h?.trim()) { toast.error("Please enter an H1 tag"); return; } setH1TagCheck(""); checkH1Tag({ variables: { h1Tag: h, excludeId: isEditMode ? selectedData?.id : undefined } }); };
     const checkMetaTitleUnique = (m: string) => { if (!m?.trim()) { toast.error("Please enter a meta title"); return; } setMetaTitleCheck(""); checkMetaTitle({ variables: { metaTitle: m, excludeId: isEditMode ? selectedData?.id : undefined } }); };
 
-    const startEditAlt = (i: number) => { setEditingIndex(i); setAltInput(imageUrl?.[i]?.alt ?? ""); };
+    const startEditAlt = (i: number) => { setEditingIndex(i); setAltInput(images?.[i]?.alt ?? ""); };
     const cancelEdit = () => { setEditingIndex(null); setAltInput(""); };
     const saveAlt = (i: number) => {
-        const next = (imageUrl ?? []).map((img, idx) => idx === i ? { ...img, alt: altInput.trim() } : img);
-        setValue("imageUrl", next, { shouldValidate: true, shouldDirty: true });
+        const next = (images ?? []).map((img, idx) => idx === i ? { ...img, alt: altInput.trim() } : img);
+        setValue("images", next, { shouldValidate: true, shouldDirty: true });
         setEditingIndex(null); setAltInput("");
     };
     const handleRemove = (i: number) => {
-        setValue("imageUrl", (imageUrl ?? []).filter((_, idx) => idx !== i), { shouldValidate: true, shouldDirty: true });
+        setValue("images", (images ?? []).filter((_, idx) => idx !== i), { shouldValidate: true, shouldDirty: true });
     };
     const handleGalleryClose = () => setShowGallery(false);
     const handleGallerySelect = (selected: any[]) => {
         if (!selected?.length) { setShowGallery(false); return; }
-        const remaining = IMAGE_MAX - (imageUrl?.length ?? 0);
+        const remaining = IMAGE_MAX - (images?.length ?? 0);
         if (remaining <= 0) { toast.error(`You can add up to ${IMAGE_MAX} images`); setShowGallery(false); return; }
         const newImages = selected.slice(0, remaining).map((img) => ({ url: img.url, alt: img.alt || "" }));
-        setValue("imageUrl", [...(imageUrl ?? []), ...newImages], { shouldValidate: true, shouldDirty: true });
+        setValue("images", [...(images ?? []), ...newImages], { shouldValidate: true, shouldDirty: true });
         setShowGallery(false);
     };
 
     const validation = {
-        total: imageUrl.length,
-        withAlt: imageUrl.filter((img) => img.alt.trim().length > 0).length,
+        total: images.length,
+        withAlt: images.filter((img) => img.alt.trim().length > 0).length,
         min: IMAGE_MIN, max: IMAGE_MAX,
     };
     const checks = [
@@ -312,7 +315,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
         value: p.id,          // query now returns `id`
         label: p.name,
         slug: p.slug,
-        imageUrl: p.imageUrl[0],
+        image: p.images[0],
     });
 
     const loadRelatedProductOptions = async (inputValue: string) => {
@@ -565,8 +568,8 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                 {activeTab === "content" && (
                                     <div className="space-y-5">
                                         <Section>
-                                            <SectionHeader title="Full Description" desc="Rich details shown on the product detail page." icon={<FiFileText className="size-4" />} />
-                                            <Controller name="description" control={control} render={({ field }) => (
+                                            <SectionHeader title="Content" desc="Rich details shown on the product detail page." icon={<FiFileText className="size-4" />} />
+                                            <Controller name="content" control={control} render={({ field }) => (
                                                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                                                     <TiptopTextEditor height="h-96" initialValue={field.value} onChange={field.onChange} />
                                                 </div>
@@ -589,7 +592,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                         <Section>
                                             <SectionHeader title="Product Images" desc="Upload up to 10 images. Add alt text for accessibility and SEO." icon={<FiImage className="size-4" />} />
                                             <div className="flex flex-wrap gap-3">
-                                                {imageUrl.map((img, index) => (
+                                                {images.map((img, index) => (
                                                     <div key={`${img.url}-${index}`}
                                                         className="group relative size-40 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm transition hover:shadow-md">
                                                         <Image src={img.url} alt={img.alt || `Product ${index + 1}`} fill className="object-cover" />
@@ -629,7 +632,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                                         )}
                                                     </div>
                                                 ))}
-                                                {(imageUrl?.length ?? 0) < IMAGE_MAX && (
+                                                {(images?.length ?? 0) < IMAGE_MAX && (
                                                     <button type="button" onClick={() => setShowGallery(true)}
                                                         className="flex size-40 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 transition hover:border-primary hover:bg-indigo-50 hover:text-primary/90">
                                                         <FiUploadCloud className="size-7" />
@@ -646,7 +649,7 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                                 ))}
                                                 <span className="ml-auto text-xs text-slate-400">{validation.total} image{validation.total !== 1 ? "s" : ""} added</span>
                                             </div>
-                                            <FieldErrorMsg message={errors.imageUrl?.message as string} />
+                                            <FieldErrorMsg message={errors.images?.message as string} />
                                         </Section>
 
                                         <Section>
@@ -837,14 +840,14 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                                         value: p.pid,
                                                         label: p.name,
                                                         slug: p.slug,
-                                                        imageUrl: p.imageUrl,
+                                                        image: p.image,
                                                     }))}
                                                     onChange={(selected) => {
                                                         const next = (selected ?? []).map((item: any) => ({
                                                             pid: item.value,
                                                             name: item.label,
                                                             slug: item.slug,
-                                                            imageUrl: item.imageUrl,
+                                                            image: item.image,
                                                         }));
                                                         setValue("relatedProducts", next, { shouldValidate: true, shouldDirty: true });
                                                     }}
@@ -892,9 +895,9 @@ const AddProduct = ({ onCancel, selectedData, isEditMode = false, refetch }: Add
                                                         key={`${p.pid}-${idx}`}
                                                         className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 transition hover:border-slate-300"
                                                     >
-                                                        {p.imageUrl?.url ? (
+                                                        {p.image?.url ? (
                                                             <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-slate-100">
-                                                                <Image src={p.imageUrl.url} alt={p.imageUrl.alt || p.name} fill className="object-cover" />
+                                                                <Image src={p.image.url} alt={p.image.alt || p.name} fill className="object-cover" />
                                                             </div>
                                                         ) : (
                                                             <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-400">

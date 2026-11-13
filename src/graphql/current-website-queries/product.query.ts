@@ -29,11 +29,11 @@ query GetPaginatedProducts(
       metaTitle
       metaDescription
       shortDescription
-      description
+      content
       specification
       status
       isFeatured
-      imageUrl {
+      images {
         url
         alt
       }
@@ -67,7 +67,7 @@ query GetPaginatedProducts(
       pid
       name
       slug
-      imageUrl {
+      image {
       url
       alt
       }
@@ -115,11 +115,11 @@ query GetAllProducts {
       metaTitle
       metaDescription
       shortDescription
-      description
+      content
       specification
       status
       isFeatured
-      imageUrl {
+      images {
         url
         alt
       }
@@ -164,11 +164,11 @@ query GetProductBySlug($slug: String!) {
     metaTitle
     metaDescription
     shortDescription
-    description
+    content
     specification
     status
     isFeatured
-    imageUrl {
+    images {
       url
       alt
     }
@@ -239,7 +239,7 @@ export const SEARCH_PRODUCTS = gql`
       id
       name
       slug
-      imageUrl { url alt }
+      images { url alt }
     }
   }
 `;

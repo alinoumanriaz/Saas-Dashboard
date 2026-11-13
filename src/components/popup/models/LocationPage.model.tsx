@@ -93,7 +93,7 @@ const locationPageFormSchema = z.object({
                 pid: z.string(),
                 name: z.string(),
                 slug: z.string(),
-                imageUrl: z
+                image: z
                     .object({ url: z.string().optional(), alt: z.string().optional() })
                     .optional(),
             })
@@ -346,7 +346,7 @@ const AddlocationPage = ({ onCancel, selectedData, isEditMode = false, refetch }
         value: p.id,          // query now returns `id`
         label: p.name,
         slug: p.slug,
-        imageUrl: p.imageUrl[0],
+        image: p.images[0],
     });
 
     const loadRelatedProductOptions = async (inputValue: string) => {
@@ -772,14 +772,14 @@ const AddlocationPage = ({ onCancel, selectedData, isEditMode = false, refetch }
                                                         value: p.pid,
                                                         label: p.name,
                                                         slug: p.slug,
-                                                        imageUrl: p.imageUrl,
+                                                        image: p.image,
                                                     }))}
                                                     onChange={(selected) => {
                                                         const next = (selected ?? []).map((item: any) => ({
                                                             pid: item.value,
                                                             name: item.label,
                                                             slug: item.slug,
-                                                            imageUrl: item.imageUrl,
+                                                            image: item.image,
                                                         }));
                                                         setValue("relatedProducts", next, { shouldValidate: true, shouldDirty: true });
                                                     }}
@@ -827,9 +827,9 @@ const AddlocationPage = ({ onCancel, selectedData, isEditMode = false, refetch }
                                                         key={`${p.pid}-${idx}`}
                                                         className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 transition hover:border-slate-300"
                                                     >
-                                                        {p.imageUrl?.url ? (
+                                                        {p.image?.url ? (
                                                             <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-slate-100">
-                                                                <Image src={p.imageUrl.url} alt={p.imageUrl.alt || p.name} fill className="object-cover" />
+                                                                <Image src={p.image.url} alt={p.image.alt || p.name} fill className="object-cover" />
                                                             </div>
                                                         ) : (
                                                             <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-400">

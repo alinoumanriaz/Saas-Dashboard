@@ -44,7 +44,7 @@ export type TableBoxConfig = {
   action?: boolean;
   image?: boolean;
   logo?: boolean;
-  iconImageUrl?: boolean;
+  iconImage?: boolean;
   bannerImage?: boolean;
   deletehandler?: (id: string[]) => void;
   edithandler?: (userData: any) => void;

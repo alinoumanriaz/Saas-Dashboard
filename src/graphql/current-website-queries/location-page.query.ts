@@ -22,6 +22,14 @@ query GetPaginatedLocationPages(
       content
       specification
       status
+      box {
+      boxTitle
+      boxContent
+      rightImage {
+      url
+      alt
+      }
+      }
       image {
         url
         alt
